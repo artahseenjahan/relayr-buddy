@@ -2,11 +2,50 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AppProvider, useApp } from "./context/AppContext";
+import Login from "./pages/Login";
+import ConnectEmail from "./pages/ConnectEmail";
+import SetupSchool from "./pages/SetupSchool";
+import SetupOffice from "./pages/SetupOffice";
+import SetupRulebook from "./pages/SetupRulebook";
+import SetupPersona from "./pages/SetupPersona";
+import Inbox from "./pages/Inbox";
+import TicketDetail from "./pages/TicketDetail";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useApp();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+};
+
+const AppRoutes = () => {
+  const { isAuthenticated, mailboxConnection } = useApp();
+
+  return (
+    <Routes>
+      <Route path="/login" element={
+        isAuthenticated
+          ? <Navigate to={mailboxConnection?.status === 'connected' ? '/inbox' : '/connect-email'} replace />
+          : <Login />
+      } />
+      <Route path="/connect-email" element={<ProtectedRoute><ConnectEmail /></ProtectedRoute>} />
+      <Route path="/setup-school" element={<ProtectedRoute><SetupSchool /></ProtectedRoute>} />
+      <Route path="/setup-office" element={<ProtectedRoute><SetupOffice /></ProtectedRoute>} />
+      <Route path="/setup-rulebook" element={<ProtectedRoute><SetupRulebook /></ProtectedRoute>} />
+      <Route path="/setup-persona" element={<ProtectedRoute><SetupPersona /></ProtectedRoute>} />
+      <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
+      <Route path="/ticket/:id" element={<ProtectedRoute><TicketDetail /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -14,11 +53,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AppProvider>
+          <AppRoutes />
+        </AppProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
