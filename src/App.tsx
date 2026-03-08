@@ -13,6 +13,7 @@ import SetupPersona from "./pages/SetupPersona";
 import Inbox from "./pages/Inbox";
 import TicketDetail from "./pages/TicketDetail";
 import Settings from "./pages/Settings";
+import SettingsRulebook from "./pages/SettingsRulebook";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ const AppRoutes = () => {
       <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
       <Route path="/ticket/:id" element={<ProtectedRoute><TicketDetail /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+      <Route path="/settings/rulebook" element={<ProtectedRoute><SettingsRulebook /></ProtectedRoute>} />
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<NotFound />} />
     </Routes>

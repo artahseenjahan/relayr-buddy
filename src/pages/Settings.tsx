@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import AppLayout from '../components/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -9,10 +10,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { Mail, Trash2, ShieldCheck, CheckCircle2, XCircle, Settings as SettingsIcon } from 'lucide-react';
+import { Mail, Trash2, ShieldCheck, CheckCircle2, XCircle, Settings as SettingsIcon, BookOpen, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function Settings() {
+  const navigate = useNavigate();
   const { mailboxConnection, disconnectMailbox, clearAllDraftsAndDecisions, drafts, decisions } = useApp();
   const [dataRetention, setDataRetention] = useState(true);
   const [cleared, setCleared] = useState(false);
@@ -117,6 +119,26 @@ export default function Settings() {
                 <CheckCircle2 className="w-3.5 h-3.5" /> All drafts and decisions have been deleted.
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Rulebook */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <BookOpen className="w-4 h-4 text-primary" /> Rulebook & Responsibility Layers
+            </CardTitle>
+            <CardDescription>Upload and manage institutional policy documents for AI grounding</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Upload PDF or DOCX rulebooks and the AI will extract responsibilities, constraints, and role boundaries across all three intelligence layers.
+              </p>
+              <Button variant="outline" size="sm" className="ml-4 shrink-0 gap-1.5" onClick={() => navigate('/settings/rulebook')}>
+                Manage <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
