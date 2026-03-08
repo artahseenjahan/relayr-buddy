@@ -38,20 +38,37 @@ All colors MUST be HSL.
 
     --radius: 0.5rem;
 
+    /* Semantic status tokens */
+    --warning: 38 95% 45%;
+    --warning-bg: 48 100% 94%;
+    --warning-foreground: 35 85% 25%;
+
+    --success: 142 71% 35%;
+    --success-bg: 140 60% 94%;
+    --success-foreground: 140 71% 20%;
+
+    --risk-flag: 0 84% 55%;
+    --risk-flag-bg: 0 86% 97%;
+
+    /* Status pill colors */
+    --status-needs-review-bg: 48 100% 94%;
+    --status-needs-review-fg: 35 85% 25%;
+    --status-approved-bg: 140 60% 94%;
+    --status-approved-fg: 142 71% 25%;
+    --status-rejected-bg: 0 86% 97%;
+    --status-rejected-fg: 0 84% 45%;
+    --status-assigned-bg: 210 40% 94%;
+    --status-assigned-fg: 222.2 47.4% 30%;
+    --status-sent-bg: 220 70% 94%;
+    --status-sent-fg: 220 70% 30%;
+
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
@@ -83,6 +100,29 @@ All colors MUST be HSL.
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    --warning: 38 90% 60%;
+    --warning-bg: 35 50% 18%;
+    --warning-foreground: 45 90% 80%;
+
+    --success: 142 60% 50%;
+    --success-bg: 140 40% 15%;
+    --success-foreground: 140 60% 75%;
+
+    --risk-flag: 0 80% 70%;
+    --risk-flag-bg: 0 50% 15%;
+
+    --status-needs-review-bg: 35 50% 18%;
+    --status-needs-review-fg: 45 90% 75%;
+    --status-approved-bg: 140 40% 15%;
+    --status-approved-fg: 142 60% 60%;
+    --status-rejected-bg: 0 50% 15%;
+    --status-rejected-fg: 0 80% 70%;
+    --status-assigned-bg: 217 30% 20%;
+    --status-assigned-fg: 210 40% 80%;
+    --status-sent-bg: 220 40% 20%;
+    --status-sent-fg: 220 60% 75%;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -102,4 +142,26 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Status pills */
+.status-needs_review {
+  background-color: hsl(var(--status-needs-review-bg));
+  color: hsl(var(--status-needs-review-fg));
+}
+.status-approved {
+  background-color: hsl(var(--status-approved-bg));
+  color: hsl(var(--status-approved-fg));
+}
+.status-rejected {
+  background-color: hsl(var(--status-rejected-bg));
+  color: hsl(var(--status-rejected-fg));
+}
+.status-assigned {
+  background-color: hsl(var(--status-assigned-bg));
+  color: hsl(var(--status-assigned-fg));
+}
+.status-sent {
+  background-color: hsl(var(--status-sent-bg));
+  color: hsl(var(--status-sent-fg));
 }
