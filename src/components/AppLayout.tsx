@@ -1,13 +1,13 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { Inbox, Settings, GraduationCap, LogOut, User, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Inbox, Settings, GraduationCap, LogOut, User, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
 import { useState } from 'react';
-import { offices } from '../data/mockDb';
 
 const navItems = [
   { path: '/inbox', icon: Inbox, label: 'Inbox' },
   { path: '/settings', icon: Settings, label: 'Settings' },
+  { path: '/settings/rulebook', icon: BookOpen, label: 'Rulebook' },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -34,15 +34,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Navigation */}
         <nav className="flex-1 p-2 space-y-0.5">
           {navItems.map(({ path, icon: Icon, label }) => {
-            const active = location.pathname === path || (path === '/inbox' && location.pathname.startsWith('/ticket'));
+            const active =
+              location.pathname === path ||
+              (path === '/inbox' && location.pathname.startsWith('/ticket'));
             return (
               <Link
                 key={path}
                 to={path}
                 className={`flex items-center gap-3 px-2 py-2 rounded-md text-sm font-medium transition-colors ${
-                  active
-                    ? 'text-primary-foreground'
-                    : 'hover:opacity-80'
+                  active ? 'text-primary-foreground' : 'hover:opacity-80'
                 }`}
                 style={{
                   background: active ? 'hsl(var(--sidebar-active-bg))' : 'transparent',
@@ -99,6 +99,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {location.pathname === '/inbox' && 'Inbox'}
             {location.pathname.startsWith('/ticket/') && 'Ticket Detail'}
             {location.pathname === '/settings' && 'Settings'}
+            {location.pathname === '/settings/rulebook' && 'Rulebook & Responsibility Layers'}
           </h1>
           {office && (
             <span className="text-xs text-muted-foreground border border-border px-2 py-0.5 rounded-full">

@@ -14,6 +14,7 @@ import { Mail, Trash2, ShieldCheck, CheckCircle2, XCircle, Settings as SettingsI
 import { format } from 'date-fns';
 
 export default function Settings() {
+  const navigate = useNavigate();
   const { mailboxConnection, disconnectMailbox, clearAllDraftsAndDecisions, drafts, decisions } = useApp();
   const [dataRetention, setDataRetention] = useState(true);
   const [cleared, setCleared] = useState(false);
