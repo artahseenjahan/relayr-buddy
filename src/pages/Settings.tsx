@@ -122,6 +122,26 @@ export default function Settings() {
           </CardContent>
         </Card>
 
+        {/* Rulebook */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <BookOpen className="w-4 h-4 text-primary" /> Rulebook & Responsibility Layers
+            </CardTitle>
+            <CardDescription>Upload and manage institutional policy documents for AI grounding</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Upload PDF or DOCX rulebooks and the AI will extract responsibilities, constraints, and role boundaries across all three intelligence layers.
+              </p>
+              <Button variant="outline" size="sm" className="ml-4 shrink-0 gap-1.5" onClick={() => navigate('/settings/rulebook')}>
+                Manage <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Privacy */}
         <Card>
           <CardHeader>
