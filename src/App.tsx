@@ -13,6 +13,7 @@ import SetupPersona from "./pages/SetupPersona";
 import Inbox from "./pages/Inbox";
 import TicketDetail from "./pages/TicketDetail";
 import Settings from "./pages/Settings";
+import SettingsRulebook from "./pages/SettingsRulebook";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
