@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import AppLayout from '../components/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { Mail, Trash2, ShieldCheck, CheckCircle2, XCircle, Settings as SettingsIcon } from 'lucide-react';
+import { Mail, Trash2, ShieldCheck, CheckCircle2, XCircle, Settings as SettingsIcon, BookOpen, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function Settings() {
