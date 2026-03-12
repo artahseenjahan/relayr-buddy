@@ -60,7 +60,7 @@ const STATUS_LABEL: Record<string, string> = {
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { tickets, updateTicket, saveDraft, getDraftForTicket, saveDecision, currentUser } = useApp();
+  const { tickets, updateTicket, saveDraft, getDraftForTicket, saveDecision, currentUser, googleSession } = useApp();
 
   const ticket = tickets.find(t => t.id === id);
   const existingDraft = getDraftForTicket(id || '');
@@ -71,6 +71,7 @@ export default function TicketDetail() {
   const [draftBody, setDraftBody] = useState(existingDraft?.body || '');
   const [draft, setDraft] = useState(existingDraft || null);
   const [generating, setGenerating] = useState(false);
+  const [gmailSearching, setGmailSearching] = useState(false);
   const [note, setNote] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [intelligenceReport, setIntelligenceReport] = useState<IntelligenceReport | null>(null);
