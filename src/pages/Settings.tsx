@@ -10,7 +10,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { Mail, Trash2, ShieldCheck, CheckCircle2, XCircle, Settings as SettingsIcon, BookOpen, ArrowRight, LogOut, Clock, ExternalLink } from 'lucide-react';
+import { Mail, Trash2, ShieldCheck, CheckCircle2, XCircle, Settings as SettingsIcon, BookOpen, ArrowRight, LogOut, Clock, ExternalLink, GitMerge } from 'lucide-react';
 import { format, formatDistanceToNowStrict } from 'date-fns';
 
 export default function Settings() {

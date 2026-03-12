@@ -98,10 +98,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Top bar */}
         <header className="h-14 border-b border-border bg-card flex items-center px-4 gap-3 shrink-0">
           <h1 className="font-semibold text-foreground text-sm">
+            {location.pathname === '/dashboard' && 'Dashboard'}
             {location.pathname === '/inbox' && 'Inbox'}
             {location.pathname.startsWith('/ticket/') && 'Ticket Detail'}
             {location.pathname === '/settings' && 'Settings'}
             {location.pathname === '/settings/rulebook' && 'Rulebook & Responsibility Layers'}
+            {location.pathname === '/settings/routing' && 'Routing Rules'}
           </h1>
           {office && (
             <span className="text-xs text-muted-foreground border border-border px-2 py-0.5 rounded-full">
