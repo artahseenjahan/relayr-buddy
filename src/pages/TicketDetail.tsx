@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { offices, personas, getRulebookByOfficeId } from '../data/mockDb';
 import { generateDraft, shortenDraft, makeMoreFormal, makeMoreWarm, addBulletList } from '../lib/draftGenerator';
 import { buildIntelligenceReport, IntelligenceReport } from '../lib/intelligenceEngine';
+import { searchGmailSent, extractTicketKeywords } from '../lib/gmailApi';
 import { Decision } from '../types';
 import AppLayout from '../components/AppLayout';
 import IntelligencePanel from '../components/IntelligencePanel';
@@ -15,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AlertTriangle, Sparkles, CheckCircle2, X, Edit3, Mail, ArrowLeft,
   Tag, Flag, MessageSquare, BookOpen, BarChart2, Brain, RefreshCw,
-  ArrowRightCircle, RotateCcw
+  ArrowRightCircle, RotateCcw, History
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 
