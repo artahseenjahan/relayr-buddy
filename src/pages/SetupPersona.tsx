@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserCircle, Plus, X, CheckCircle2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { UserCircle, Plus, X, CheckCircle2, Sparkles, Mail, ShieldCheck, AlertCircle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import OnboardingLayout from '../components/OnboardingLayout';
 import { ToneDefault } from '../types';
+import { fetchSentEmails, GmailMessageMeta } from '../lib/gmailApi';
+import { extractPersonaFromEmails, ExtractedPersonaProfile } from '../lib/personaExtractor';
 
 const ListField = ({ label, items, onChange, placeholder }: { label: string; items: string[]; onChange: (items: string[]) => void; placeholder?: string }) => {
   const [input, setInput] = useState('');
@@ -37,6 +41,7 @@ const ListField = ({ label, items, onChange, placeholder }: { label: string; ite
 
 export default function SetupPersona() {
   const navigate = useNavigate();
+  const { googleSession } = useApp();
   const [roleTitle, setRoleTitle] = useState('');
   const [authorityLevel, setAuthorityLevel] = useState('2');
   const [toneDefault, setToneDefault] = useState<ToneDefault>('warm-professional');
@@ -47,10 +52,81 @@ export default function SetupPersona() {
   const [approvedPhrases, setApprovedPhrases] = useState<string[]>([]);
   const [safeLanguageTemplates, setSafeLanguageTemplates] = useState<string[]>([]);
 
+  // Gmail calibration state
+  const [gmailStep, setGmailStep] = useState<'idle' | 'loading' | 'selecting' | 'extracting' | 'preview'>('idle');
+  const [gmailEmails, setGmailEmails] = useState<GmailMessageMeta[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [extractedProfile, setExtractedProfile] = useState<ExtractedPersonaProfile | null>(null);
+  const [gmailError, setGmailError] = useState<string | null>(null);
+  const [gmailExpanded, setGmailExpanded] = useState(false);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     navigate('/inbox');
   };
+
+  const loadGmailEmails = async () => {
+    if (!googleSession) return;
+    setGmailStep('loading');
+    setGmailError(null);
+    try {
+      const emails = await fetchSentEmails(googleSession.accessToken, 50);
+      setGmailEmails(emails);
+      setGmailStep('selecting');
+      // Auto-select first 10
+      setSelectedIds(new Set(emails.slice(0, 10).map(e => e.id)));
+    } catch (err: any) {
+      setGmailError(err?.message || 'Failed to load emails. Please check your connection.');
+      setGmailStep('idle');
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else if (next.size < 25) {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleExtract = async () => {
+    const selected = gmailEmails.filter(e => selectedIds.has(e.id));
+    if (selected.length === 0) return;
+    setGmailStep('extracting');
+    await new Promise(r => setTimeout(r, 800)); // brief processing pause for UX
+    const profile = extractPersonaFromEmails(selected);
+    setExtractedProfile(profile);
+    setGmailStep('preview');
+  };
+
+  const applyExtractedProfile = () => {
+    if (!extractedProfile) return;
+    setToneDefault(extractedProfile.toneDefault);
+    setApprovedPhrases(prev => {
+      const combined = [...new Set([...prev, ...extractedProfile.approvedPhrases])];
+      return combined.slice(0, 12);
+    });
+    setSafeLanguageTemplates(prev => {
+      const combined = [...new Set([...prev, ...extractedProfile.safeLanguageTemplates])];
+      return combined.slice(0, 6);
+    });
+    setGmailExpanded(false);
+    setGmailStep('idle');
+  };
+
+  const ScoreBar = ({ value, label }: { value: number; label: string }) => (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-muted-foreground w-20 shrink-0">{label}</span>
+      <div className="flex-1 h-1.5 bg-border rounded-full overflow-hidden">
+        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.round(value * 100)}%` }} />
+      </div>
+      <span className="text-xs font-medium w-8 text-right">{Math.round(value * 100)}%</span>
+    </div>
+  );
 
   return (
     <OnboardingLayout step={4} totalSteps={4} title="Define Persona">
@@ -64,6 +140,176 @@ export default function SetupPersona() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+
+            {/* ── Gmail Calibration Panel ── */}
+            <div className="rounded-lg border border-primary/30 bg-primary/5 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setGmailExpanded(v => !v)}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-primary/10 transition-colors"
+              >
+                <Sparkles className="w-4 h-4 text-primary shrink-0" />
+                <div className="flex-1">
+                  <div className="text-sm font-semibold text-foreground">Calibrate Persona from Gmail</div>
+                  <div className="text-xs text-muted-foreground">Auto-extract your tone & phrases from up to 25 sent emails (snippets only, never full text)</div>
+                </div>
+                {googleSession && (
+                  <span className="text-[10px] bg-primary/15 text-primary px-2 py-0.5 rounded-full font-medium">Connected</span>
+                )}
+                {gmailExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+              </button>
+
+              {gmailExpanded && (
+                <div className="border-t border-primary/20 p-4 space-y-4">
+                  {!googleSession ? (
+                    <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-muted-foreground mt-0.5" />
+                      <span>Connect your Gmail account first on the <a href="/connect-email" className="text-primary hover:underline">email connection page</a> to enable persona calibration.</span>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Connected badge */}
+                      <div className="flex items-center gap-2 text-xs">
+                        <Mail className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-muted-foreground">Connected as</span>
+                        <span className="font-medium text-foreground">{googleSession.userEmail}</span>
+                      </div>
+
+                      {gmailError && (
+                        <div className="flex items-start gap-2 p-2.5 rounded bg-destructive/10 border border-destructive/20 text-xs text-destructive">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          {gmailError}
+                        </div>
+                      )}
+
+                      {gmailStep === 'idle' && (
+                        <Button type="button" size="sm" className="w-full gap-1.5" onClick={loadGmailEmails}>
+                          <Mail className="w-3.5 h-3.5" /> Load My Recent Sent Emails
+                        </Button>
+                      )}
+
+                      {gmailStep === 'loading' && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          Fetching sent emails (snippets only)…
+                        </div>
+                      )}
+
+                      {gmailStep === 'extracting' && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                          <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                          Analysing communication patterns…
+                        </div>
+                      )}
+
+                      {gmailStep === 'selecting' && gmailEmails.length > 0 && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs text-muted-foreground">
+                              Select up to 25 emails to analyse. <span className="font-medium text-foreground">{selectedIds.size}/25 selected</span>
+                            </p>
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={selectedIds.size === 0}
+                              onClick={handleExtract}
+                              className="gap-1.5 text-xs h-7"
+                            >
+                              <Sparkles className="w-3 h-3" /> Extract Persona
+                            </Button>
+                          </div>
+                          <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
+                            {gmailEmails.map(email => (
+                              <label
+                                key={email.id}
+                                className={`flex items-start gap-2.5 p-2 rounded cursor-pointer hover:bg-accent transition-colors ${selectedIds.has(email.id) ? 'bg-primary/10 border border-primary/20' : 'border border-transparent'}`}
+                              >
+                                <Checkbox
+                                  checked={selectedIds.has(email.id)}
+                                  onCheckedChange={() => toggleSelect(email.id)}
+                                  disabled={!selectedIds.has(email.id) && selectedIds.size >= 25}
+                                  className="mt-0.5 shrink-0"
+                                />
+                                <div className="min-w-0">
+                                  <div className="text-xs font-medium truncate">{email.subject}</div>
+                                  <div className="text-[10px] text-muted-foreground truncate">{email.snippet}</div>
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                            <ShieldCheck className="w-3 h-3 text-primary" />
+                            Only snippets (~100 chars) are processed. Full email bodies are never read or stored.
+                          </div>
+                        </div>
+                      )}
+
+                      {gmailStep === 'preview' && extractedProfile && (
+                        <div className="space-y-3">
+                          <div className="p-3 rounded-lg bg-muted space-y-2">
+                            <p className="text-xs font-semibold text-foreground">Extraction Results</p>
+                            <p className="text-[10px] text-muted-foreground">{extractedProfile.styleSummary}</p>
+                            <div className="space-y-1.5 pt-1">
+                              <ScoreBar value={extractedProfile.formalityScore} label="Formality" />
+                              <ScoreBar value={extractedProfile.warmthScore} label="Warmth" />
+                              <ScoreBar value={extractedProfile.conciseScore} label="Conciseness" />
+                            </div>
+                          </div>
+
+                          <div className="p-3 rounded-lg bg-muted space-y-1.5">
+                            <p className="text-xs font-medium">Detected Style</p>
+                            <div className="flex gap-2 flex-wrap text-[10px]">
+                              <span className="px-2 py-0.5 rounded-full bg-primary/15 text-primary font-medium">
+                                Tone: {extractedProfile.toneDefault.replace('-', ' ')}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full bg-accent text-accent-foreground">
+                                Opens with: {extractedProfile.dominantSalutation}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full bg-accent text-accent-foreground">
+                                Closes with: {extractedProfile.dominantClosing}
+                              </span>
+                            </div>
+                          </div>
+
+                          {extractedProfile.approvedPhrases.length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-xs font-medium">Recurring Phrases</p>
+                              {extractedProfile.approvedPhrases.slice(0, 4).map((p, i) => (
+                                <div key={i} className="text-[10px] text-muted-foreground bg-muted rounded px-2 py-1 truncate">
+                                  "{p}"
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="flex-1 gap-1.5"
+                              onClick={applyExtractedProfile}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Apply to Persona
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setGmailStep('selecting')}
+                              className="gap-1.5"
+                            >
+                              Re-select
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ── Manual Form Fields ── */}
             <div className="space-y-3">
               <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">1. Role</h3>
               <div className="grid grid-cols-2 gap-3">
