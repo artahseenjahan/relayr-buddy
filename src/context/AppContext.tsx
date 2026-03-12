@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
-import { User, MailboxConnection, School, Office, Persona, Ticket, Draft, Decision, GoogleOAuthSession } from '../types';
+import { User, MailboxConnection, School, Office, Persona, Ticket, Draft, Decision, GoogleOAuthSession, RoutingRule } from '../types';
 import {
   users, mailboxConnections as seedMailbox, schools, offices, personas,
   tickets as seedTickets, drafts as seedDrafts, decisions as seedDecisions,
