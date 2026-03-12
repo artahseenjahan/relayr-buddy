@@ -20,6 +20,7 @@ interface AppState {
   decisions: Decision[];
   isAuthenticated: boolean;
   googleSession: GoogleOAuthSession | null;
+  routingRules: RoutingRule[];
 }
 
 interface AppContextType extends AppState {
@@ -37,6 +38,9 @@ interface AppContextType extends AppState {
   clearAllDraftsAndDecisions: () => void;
   connectGoogle: () => Promise<GoogleOAuthSession>;
   revokeGoogle: () => Promise<void>;
+  addRoutingRule: (rule: RoutingRule) => void;
+  updateRoutingRule: (rule: RoutingRule) => void;
+  deleteRoutingRule: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
