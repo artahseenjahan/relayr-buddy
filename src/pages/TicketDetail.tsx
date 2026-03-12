@@ -95,8 +95,25 @@ export default function TicketDetail() {
   const handleGenerate = async () => {
     if (!office || !rulebook || !persona) return;
     setGenerating(true);
-    await new Promise(r => setTimeout(r, 1400));
-    const newDraft = generateDraft(ticket, office, rulebook, persona);
+
+    let gmailExamples: string[] = [];
+
+    // Layer 1: search Gmail history for similar past responses
+    if (googleSession) {
+      setGmailSearching(true);
+      try {
+        const latestMsg = ticket.threadMessages[ticket.threadMessages.length - 1];
+        const keywords = extractTicketKeywords(ticket.subject, latestMsg?.body);
+        const matches = await searchGmailSent(googleSession.accessToken, keywords);
+        gmailExamples = matches.map(m => m.snippet).filter(Boolean);
+      } catch {
+        // Gmail search failure is non-fatal — fall back to standard generation
+      }
+      setGmailSearching(false);
+    }
+
+    await new Promise(r => setTimeout(r, 800));
+    const newDraft = generateDraft(ticket, office, rulebook, persona, gmailExamples);
     const report = buildIntelligenceReport(ticket, office, rulebook, persona);
     saveDraft(newDraft);
     setDraft(newDraft);
