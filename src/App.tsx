@@ -43,8 +43,10 @@ const AppRoutes = () => {
       <Route path="/setup-persona" element={<ProtectedRoute><SetupPersona /></ProtectedRoute>} />
       <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
       <Route path="/ticket/:id" element={<ProtectedRoute><TicketDetail /></ProtectedRoute>} />
+      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/settings/rulebook" element={<ProtectedRoute><SettingsRulebook /></ProtectedRoute>} />
+      <Route path="/settings/routing" element={<ProtectedRoute><SettingsRouting /></ProtectedRoute>} />
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
