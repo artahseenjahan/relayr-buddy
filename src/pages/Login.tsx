@@ -23,7 +23,7 @@ export default function Login() {
     const success = login(email, password);
     setLoading(false);
     if (success) {
-      navigate(mailboxConnection?.status === 'connected' ? '/inbox' : '/connect-email');
+      navigate('/inbox');
     } else {
       setError('Invalid email or password. Try alex@westbrook.edu / password123');
     }

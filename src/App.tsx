@@ -10,10 +10,12 @@ import SetupSchool from "./pages/SetupSchool";
 import SetupOffice from "./pages/SetupOffice";
 import SetupRulebook from "./pages/SetupRulebook";
 import SetupPersona from "./pages/SetupPersona";
+import Dashboard from "./pages/Dashboard";
 import Inbox from "./pages/Inbox";
 import TicketDetail from "./pages/TicketDetail";
 import Settings from "./pages/Settings";
 import SettingsRulebook from "./pages/SettingsRulebook";
+import SettingsRouting from "./pages/SettingsRouting";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,7 +33,7 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={
         isAuthenticated
-          ? <Navigate to={mailboxConnection?.status === 'connected' ? '/inbox' : '/connect-email'} replace />
+          ? <Navigate to="/inbox" replace />
           : <Login />
       } />
       <Route path="/connect-email" element={<ProtectedRoute><ConnectEmail /></ProtectedRoute>} />
@@ -41,8 +43,10 @@ const AppRoutes = () => {
       <Route path="/setup-persona" element={<ProtectedRoute><SetupPersona /></ProtectedRoute>} />
       <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
       <Route path="/ticket/:id" element={<ProtectedRoute><TicketDetail /></ProtectedRoute>} />
+      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/settings/rulebook" element={<ProtectedRoute><SettingsRulebook /></ProtectedRoute>} />
+      <Route path="/settings/routing" element={<ProtectedRoute><SettingsRouting /></ProtectedRoute>} />
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<NotFound />} />
     </Routes>

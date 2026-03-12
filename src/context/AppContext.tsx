@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
-import { User, MailboxConnection, School, Office, Persona, Ticket, Draft, Decision, GoogleOAuthSession } from '../types';
+import { User, MailboxConnection, School, Office, Persona, Ticket, Draft, Decision, GoogleOAuthSession, RoutingRule } from '../types';
 import {
   users, mailboxConnections as seedMailbox, schools, offices, personas,
   tickets as seedTickets, drafts as seedDrafts, decisions as seedDecisions,
@@ -20,6 +20,7 @@ interface AppState {
   decisions: Decision[];
   isAuthenticated: boolean;
   googleSession: GoogleOAuthSession | null;
+  routingRules: RoutingRule[];
 }
 
 interface AppContextType extends AppState {
@@ -37,6 +38,9 @@ interface AppContextType extends AppState {
   clearAllDraftsAndDecisions: () => void;
   connectGoogle: () => Promise<GoogleOAuthSession>;
   revokeGoogle: () => Promise<void>;
+  addRoutingRule: (rule: RoutingRule) => void;
+  updateRoutingRule: (rule: RoutingRule) => void;
+  deleteRoutingRule: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -54,6 +58,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [draftList, setDraftList] = useState<Draft[]>(seedDrafts);
   const [decisionList, setDecisionList] = useState<Decision[]>(seedDecisions);
   const [googleSession, setGoogleSession] = useState<GoogleOAuthSession | null>(() => loadSession());
+  const [routingRules, setRoutingRules] = useState<RoutingRule[]>([
+    { id: 'rule-1', keywords: ['FAFSA', 'financial aid', 'tuition', 'scholarship', 'grant'], targetDepartment: 'Financial Aid Office', reason: 'Topics relating to tuition costs, financial assistance, FAFSA, grants, or scholarships belong to Financial Aid.' },
+    { id: 'rule-2', keywords: ['transcript', 'enrollment', 'graduation', 'degree audit', 'credits'], targetDepartment: "Registrar's Office", reason: 'Academic records, enrollment verification, transcripts, and degree requirements are handled by the Registrar.' },
+    { id: 'rule-3', keywords: ['password reset', 'login', 'VPN', 'wifi', 'portal access', 'IT'], targetDepartment: 'IT Help Desk', reason: 'Technical issues, account access, and campus system problems should be routed to IT support.' },
+  ]);
 
   const login = (email: string, password: string): boolean => {
     const user = users.find(u => u.email === email);
@@ -140,6 +149,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDecisionList([]);
   };
 
+  const addRoutingRule = (rule: RoutingRule) => setRoutingRules(prev => [...prev, rule]);
+  const updateRoutingRule = (rule: RoutingRule) => setRoutingRules(prev => prev.map(r => r.id === rule.id ? rule : r));
+  const deleteRoutingRule = (id: string) => setRoutingRules(prev => prev.filter(r => r.id !== id));
+
   return (
     <AppContext.Provider value={{
       currentUser,
@@ -149,6 +162,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       decisions: decisionList,
       isAuthenticated: !!currentUser,
       googleSession,
+      routingRules,
       login,
       logout,
       connectMailbox,
@@ -163,6 +177,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       getDraftForTicket,
       saveDecision,
       clearAllDraftsAndDecisions,
+      addRoutingRule,
+      updateRoutingRule,
+      deleteRoutingRule,
     }}>
       {children}
     </AppContext.Provider>
