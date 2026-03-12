@@ -31,7 +31,7 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={
         isAuthenticated
-          ? <Navigate to={mailboxConnection?.status === 'connected' ? '/inbox' : '/connect-email'} replace />
+          ? <Navigate to="/inbox" replace />
           : <Login />
       } />
       <Route path="/connect-email" element={<ProtectedRoute><ConnectEmail /></ProtectedRoute>} />
