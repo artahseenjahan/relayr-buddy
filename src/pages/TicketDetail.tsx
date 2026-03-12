@@ -42,7 +42,7 @@ function highlightSensitive(text: string): React.ReactNode[] {
   allMatches.forEach(({ start, end, label }) => {
     if (start > pos) parts.push(<span key={key++}>{text.slice(pos, start)}</span>);
     parts.push(
-      <mark key={key++} className="bg-yellow-200 text-yellow-900 rounded px-0.5 cursor-help" title={`Sensitive: ${label}`}>
+      <mark key={key++} className="bg-[hsl(var(--warning-bg))] text-[hsl(var(--warning-foreground))] rounded px-0.5 cursor-help" title={`Sensitive: ${label}`}>
         {text.slice(start, end)}
       </mark>
     );
