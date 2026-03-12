@@ -149,6 +149,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDecisionList([]);
   };
 
+  const addRoutingRule = (rule: RoutingRule) => setRoutingRules(prev => [...prev, rule]);
+  const updateRoutingRule = (rule: RoutingRule) => setRoutingRules(prev => prev.map(r => r.id === rule.id ? rule : r));
+  const deleteRoutingRule = (id: string) => setRoutingRules(prev => prev.filter(r => r.id !== id));
+
   return (
     <AppContext.Provider value={{
       currentUser,
@@ -158,6 +162,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       decisions: decisionList,
       isAuthenticated: !!currentUser,
       googleSession,
+      routingRules,
       login,
       logout,
       connectMailbox,
@@ -172,6 +177,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       getDraftForTicket,
       saveDecision,
       clearAllDraftsAndDecisions,
+      addRoutingRule,
+      updateRoutingRule,
+      deleteRoutingRule,
     }}>
       {children}
     </AppContext.Provider>
