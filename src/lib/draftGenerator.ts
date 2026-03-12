@@ -24,7 +24,7 @@ function checkEscalationTriggers(ticket: Ticket, rulebook: OfficeRulebook): stri
 function buildAcknowledgement(ticket: Ticket, persona: Persona): string {
   const phrases = persona.approvedPhrases;
   const base = phrases.length > 0 ? phrases[0] : 'Thank you for your message';
-  return `${base}. We understand you have a question regarding: \"${ticket.subject}\".`;
+  return `${base}. We understand you have a question regarding: "${ticket.subject}".`;
 }
 
 function buildAnswer(ticket: Ticket, office: Office, rulebook: OfficeRulebook, persona: Persona): string {
@@ -32,7 +32,6 @@ function buildAnswer(ticket: Ticket, office: Office, rulebook: OfficeRulebook, p
   const templates = persona.safeLanguageTemplates;
   const template = templates.length > 0 ? templates[0] : 'I would be happy to assist you with your inquiry.';
 
-  // Build a contextual answer based on office responsibilities
   const relevantResponsibility = rulebook.responsibilities.find(r =>
     keywords.some(k => r.toLowerCase().includes(k))
   ) || rulebook.responsibilities[0];
@@ -43,7 +42,6 @@ function buildAnswer(ticket: Ticket, office: Office, rulebook: OfficeRulebook, p
 function buildNextSteps(rulebook: OfficeRulebook): string {
   const links = rulebook.requiredLinks;
   if (links.length === 0) return 'Please contact our office if you have additional questions.';
-
   const linkList = links.slice(0, 2).map(l => `• ${l.label}: ${l.url}`).join('\n');
   return `To proceed, please review the following resources:\n${linkList}`;
 }
@@ -58,11 +56,33 @@ function buildDisclaimers(ticket: Ticket, rulebook: OfficeRulebook): string {
   return '\n\nPlease note: ' + toUse.join(' ');
 }
 
+/**
+ * Weave Gmail example snippets into the draft to personalise it.
+ * Only the snippets (≤100 chars each) are used — never full bodies.
+ */
+function weaveGmailExamples(body: string, gmailExamples: string[]): string {
+  if (gmailExamples.length === 0) return body;
+  // Extract any recognisable opening phrases from the examples to replace the generic greeting
+  const warmPhrases = gmailExamples
+    .flatMap(ex => ex.match(/^[A-Z][^.!?]{10,60}[.!?]/g) || [])
+    .slice(0, 2);
+
+  if (warmPhrases.length === 0) return body;
+
+  // Replace the second paragraph (acknowledgement) with a phrase flavored by the real history
+  const paras = body.split('\n\n');
+  if (paras.length >= 2) {
+    paras[1] = `${warmPhrases[0]} ${paras[1]}`;
+  }
+  return paras.join('\n\n');
+}
+
 export function generateDraft(
   ticket: Ticket,
   office: Office,
   rulebook: OfficeRulebook,
-  persona: Persona
+  persona: Persona,
+  gmailExamples?: string[]   // snippets from matching sent mail — optional
 ): Draft {
   const triggersMatched = checkEscalationTriggers(ticket, rulebook);
   const hasEscalation = triggersMatched.length > 0;
@@ -77,7 +97,7 @@ export function generateDraft(
     : '';
   const closing = toneClosings[persona.toneDefault] || toneClosings['warm-professional'];
 
-  const body = [
+  let body = [
     greeting,
     acknowledgement,
     answer,
@@ -87,6 +107,11 @@ export function generateDraft(
     closing,
     persona.signatureBlock,
   ].filter(Boolean).join('\n\n');
+
+  // Layer 1: personalise with Gmail history if available
+  if (gmailExamples && gmailExamples.length > 0) {
+    body = weaveGmailExamples(body, gmailExamples);
+  }
 
   const confidenceScore = hasEscalation
     ? Math.round((0.55 + Math.random() * 0.2) * 100) / 100
@@ -98,12 +123,16 @@ export function generateDraft(
     `Westbrook State University Policy Manual`,
   ];
 
-  const exampleEmailsUsed = [
-    `Similar ${office.name} inquiry from archive (Q3 2024)`,
-    `Standard ${persona.toneDefault} response template`,
-  ];
+  const exampleEmailsUsed: string[] = gmailExamples && gmailExamples.length > 0
+    ? [
+        ...gmailExamples.slice(0, 3).map((ex, i) => `Gmail history match #${i + 1}: "${ex.slice(0, 60)}…"`),
+        `Standard ${persona.toneDefault} response template`,
+      ]
+    : [
+        `Similar ${office.name} inquiry from archive (Q3 2024)`,
+        `Standard ${persona.toneDefault} response template`,
+      ];
 
-  // Update ticket risk flags if escalation detected
   if (hasEscalation && !ticket.riskFlags.includes('Needs Human Attention')) {
     ticket.riskFlags.push('Needs Human Attention');
   }
@@ -123,7 +152,6 @@ export function generateDraft(
 
 export function shortenDraft(body: string): string {
   const paragraphs = body.split('\n\n').filter(Boolean);
-  // Keep greeting, first substantive paragraph, next steps, and signature
   const keep = [
     paragraphs[0],
     paragraphs[2] || paragraphs[1],

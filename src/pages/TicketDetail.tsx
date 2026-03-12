@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { offices, personas, getRulebookByOfficeId } from '../data/mockDb';
 import { generateDraft, shortenDraft, makeMoreFormal, makeMoreWarm, addBulletList } from '../lib/draftGenerator';
 import { buildIntelligenceReport, IntelligenceReport } from '../lib/intelligenceEngine';
+import { searchGmailSent, extractTicketKeywords } from '../lib/gmailApi';
 import { Decision } from '../types';
 import AppLayout from '../components/AppLayout';
 import IntelligencePanel from '../components/IntelligencePanel';
@@ -15,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AlertTriangle, Sparkles, CheckCircle2, X, Edit3, Mail, ArrowLeft,
   Tag, Flag, MessageSquare, BookOpen, BarChart2, Brain, RefreshCw,
-  ArrowRightCircle, RotateCcw
+  ArrowRightCircle, RotateCcw, History
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 
@@ -41,7 +42,7 @@ function highlightSensitive(text: string): React.ReactNode[] {
   allMatches.forEach(({ start, end, label }) => {
     if (start > pos) parts.push(<span key={key++}>{text.slice(pos, start)}</span>);
     parts.push(
-      <mark key={key++} className="bg-yellow-200 text-yellow-900 rounded px-0.5 cursor-help" title={`Sensitive: ${label}`}>
+      <mark key={key++} className="bg-[hsl(var(--warning-bg))] text-[hsl(var(--warning-foreground))] rounded px-0.5 cursor-help" title={`Sensitive: ${label}`}>
         {text.slice(start, end)}
       </mark>
     );
@@ -59,7 +60,7 @@ const STATUS_LABEL: Record<string, string> = {
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { tickets, updateTicket, saveDraft, getDraftForTicket, saveDecision, currentUser } = useApp();
+  const { tickets, updateTicket, saveDraft, getDraftForTicket, saveDecision, currentUser, googleSession } = useApp();
 
   const ticket = tickets.find(t => t.id === id);
   const existingDraft = getDraftForTicket(id || '');
@@ -70,6 +71,7 @@ export default function TicketDetail() {
   const [draftBody, setDraftBody] = useState(existingDraft?.body || '');
   const [draft, setDraft] = useState(existingDraft || null);
   const [generating, setGenerating] = useState(false);
+  const [gmailSearching, setGmailSearching] = useState(false);
   const [note, setNote] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [intelligenceReport, setIntelligenceReport] = useState<IntelligenceReport | null>(null);
@@ -93,8 +95,25 @@ export default function TicketDetail() {
   const handleGenerate = async () => {
     if (!office || !rulebook || !persona) return;
     setGenerating(true);
-    await new Promise(r => setTimeout(r, 1400));
-    const newDraft = generateDraft(ticket, office, rulebook, persona);
+
+    let gmailExamples: string[] = [];
+
+    // Layer 1: search Gmail history for similar past responses
+    if (googleSession) {
+      setGmailSearching(true);
+      try {
+        const latestMsg = ticket.threadMessages[ticket.threadMessages.length - 1];
+        const keywords = extractTicketKeywords(ticket.subject, latestMsg?.body);
+        const matches = await searchGmailSent(googleSession.accessToken, keywords);
+        gmailExamples = matches.map(m => m.snippet).filter(Boolean);
+      } catch {
+        // Gmail search failure is non-fatal — fall back to standard generation
+      }
+      setGmailSearching(false);
+    }
+
+    await new Promise(r => setTimeout(r, 800));
+    const newDraft = generateDraft(ticket, office, rulebook, persona, gmailExamples);
     const report = buildIntelligenceReport(ticket, office, rulebook, persona);
     saveDraft(newDraft);
     setDraft(newDraft);
@@ -334,9 +353,9 @@ export default function TicketDetail() {
 
                 <div className="p-3 border-b border-border space-y-2 shrink-0">
                   <div className="flex items-center justify-between">
-                    <Button onClick={handleGenerate} disabled={generating} size="sm" className="flex-1 gap-1.5">
+                    <Button onClick={handleGenerate} disabled={generating || gmailSearching} size="sm" className="flex-1 gap-1.5">
                       <Sparkles className="w-3.5 h-3.5" />
-                      {generating ? 'Generating…' : draft ? 'Regenerate Draft' : 'Generate Draft'}
+                      {gmailSearching ? 'Searching Gmail history…' : generating ? 'Generating…' : draft ? 'Regenerate Draft' : 'Generate Draft'}
                     </Button>
                     {draft && (
                       <span className="text-xs text-muted-foreground ml-2">
@@ -344,6 +363,12 @@ export default function TicketDetail() {
                       </span>
                     )}
                   </div>
+                  {googleSession && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground px-0.5">
+                      <History className="w-3 h-3 text-primary" />
+                      Gmail history active — draft will be personalised from your sent mail
+                    </div>
+                  )}
                   {draftBody && (
                     <div className="grid grid-cols-2 gap-1.5">
                       {[

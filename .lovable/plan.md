@@ -1,95 +1,75 @@
 
-## What the user wants
+## CampusReply MVP — Implementation Plan
 
-Three interconnected backend-connected features, all using real Google OAuth (Gmail API):
-
-1. **Google OAuth login** — replace the mock email+password login with real Google Sign-In via OAuth. Store only the OAuth access token (encrypted in sessionStorage, revocable from Google account). No full email bodies stored.
-
-2. **Persona calibration from Gmail** — in the persona setup/settings, staff pick up to 25 of their own sent emails from Gmail. The system extracts tone/style signals (Layer 1 persona) from those emails. Only metadata + short snippets are processed, not full bodies.
-
-3. **Contextual draft generation via Gmail search** — when generating a reply draft, extract keywords from the incoming ticket email, then search the user's Gmail (by label + keywords) for similar past emails they've sent. Use those matched examples to personalize the draft output (Layer 1 intelligence).
+### Architecture Overview
+- **Mock database**: In-memory data store with TypeScript interfaces matching the full data model
+- **Mock AI**: Deterministic draft generator using persona/rulebook rules
+- **React Router**: All routes as defined
+- **State management**: React Context + hooks for global state (current user, school, office, persona)
 
 ---
 
-## Technical approach
-
-### Authentication: Google OAuth (real)
-- **No Supabase needed** — we use the Google Identity Services (GIS) implicit flow entirely client-side, which gives an `access_token` valid for 1 hour. This is sufficient for reading Gmail.
-- Store only the `access_token` + `token_expiry` in sessionStorage (encrypted with a simple XOR+base64 obfuscation — production would use a backend). Never store refresh tokens client-side.
-- New `src/lib/googleAuth.ts` — wraps GIS token flow, `signInWithGoogle()`, `getGoogleToken()`, `revokeGoogleToken()`.
-- `ConnectEmail.tsx` — the "Connect Gmail" button triggers real OAuth popup. On success, store token + user info (name, email only). "Connect Outlook" stays mock.
-- `AppContext.tsx` — add `googleToken`, `googleUser` state, `connectGoogle()`, `revokeGoogle()` methods.
-- `types/index.ts` — add `GoogleOAuthSession` interface.
-- Privacy note shown in UI: "Tokens are stored in-session only and can be revoked from your Google account at any time."
-
-### Persona Calibration: Gmail Sent Email Picker
-- New `src/lib/gmailApi.ts` — thin wrapper for Gmail REST API calls:
-  - `fetchSentEmails(token, maxResults)` — hits `GET /gmail/v1/users/me/messages?labelIds=SENT&maxResults=50`
-  - `fetchEmailSnippet(token, messageId)` — gets subject + snippet (not full body) from `GET /gmail/v1/users/me/messages/{id}?format=metadata,snippet`
-- New `src/pages/SetupPersonaGmail.tsx` (or add a new step/tab in `SetupPersona.tsx`) — "Calibrate from Gmail" section:
-  - Button "Load my recent sent emails" → calls `fetchSentEmails()`
-  - Shows a list of up to 50 sent emails (subject + snippet only, ~1 line)
-  - Staff check up to 25 to include
-  - Button "Extract Persona" → calls `extractPersonaFromEmails(selectedEmails)` in a new `src/lib/personaExtractor.ts`
-  - Extracted signals: dominant tone (formal/warm/concise), avg sentence length, common opening/closing phrases, salutation style
-  - Shows extracted results as a preview with "Apply to Persona" button
-  - Populates `toneDefault`, `approvedPhrases`, `safeLanguageTemplates` automatically
-
-- `src/lib/personaExtractor.ts` — heuristic NLP (no external API):
-  - Regex + word frequency analysis on snippets
-  - Detects: formality signals (Dear/Hi/Hello ratio), closing phrases, avg word count
-  - Returns `ExtractedPersonaProfile { toneDefault, approvedPhrases[], safeLanguageTemplates[], styleSummary }`
-
-### Draft Generation: Gmail Keyword Search
-- In `src/lib/gmailApi.ts`:
-  - `searchGmailSent(token, query)` — `GET /gmail/v1/users/me/messages?q=in:sent+{keywords}&maxResults=5`
-  - `fetchEmailSnippet(token, messageId)` — same as above, snippet only
-- In `src/lib/draftGenerator.ts`:
-  - `generateDraft()` accepts optional `gmailExamples?: string[]` (snippets from matched emails)
-  - When provided, weave in phrases/opening patterns from matched examples
-  - `sourcesUsed` in Draft now includes "Gmail: [subject snippet]" entries
-- In `src/pages/TicketDetail.tsx`:
-  - "Generate Draft" button: if `googleToken` is available in context, first calls `searchGmailSent()` with extracted keywords from the ticket
-  - Shows a small "Personalizing from your Gmail history…" spinner step before draft appears
-  - If no token → falls back to current mock generation (graceful degradation)
-
-### Privacy & Token Management
-- `Settings.tsx` — add a "Google Account" card showing:
-  - Connected Google account name + email
-  - "Revoke Access" button → calls `revokeGoogleToken()` + clears sessionStorage
-  - Note: "Token valid for 1 hour · No email content is stored · Revoke at: myaccount.google.com/permissions"
-- Never log or persist full email bodies anywhere
+### Phase 1: Data Layer & Seed Data
+- Full TypeScript types for all entities (School, Office, OfficeRulebook, Persona, User, Ticket, Draft, Decision, etc.)
+- Mock database module with all seed data:
+  - 1 Public University (e.g., "Westbrook State University")
+  - 4 Offices: Admissions, Registrar, Financial Aid, IT Help Desk
+  - OfficeRulebook per office with realistic rules
+  - 1–2 Personas per office
+  - 8 realistic tickets per office (32 total)
+  - 1 seed user linked to Admissions
 
 ---
 
-## Files to create/modify
-
-**New files:**
-- `src/lib/googleAuth.ts` — GIS OAuth wrapper
-- `src/lib/gmailApi.ts` — Gmail REST API calls (snippets only)
-- `src/lib/personaExtractor.ts` — heuristic tone extractor from email snippets
-
-**Modified files:**
-- `src/types/index.ts` — add `GoogleOAuthSession`
-- `src/context/AppContext.tsx` — add Google token state + methods
-- `src/pages/ConnectEmail.tsx` — real Google OAuth button
-- `src/pages/SetupPersona.tsx` — add "Calibrate from Gmail" section
-- `src/pages/TicketDetail.tsx` — Gmail-powered draft generation with keyword search
-- `src/lib/draftGenerator.ts` — accept `gmailExamples` param
-- `src/pages/Settings.tsx` — Google account + revoke card
+### Phase 2: Auth & Onboarding Flow
+- `/login` — email/password form, mock auth, redirect logic
+- `/connect-email` — Gmail/Outlook mock OAuth buttons, sets MailboxConnection
+- `/setup-school` — form with name, category dropdown, domain
+- `/setup-office` — name, description, primary audience
+- `/setup-rulebook` — dynamic list fields for all 6 rulebook sections
+- `/setup-persona` — 4-section form (Role, Tone/Style, Boundaries, Language)
 
 ---
 
-## Google OAuth scope required
-`https://www.googleapis.com/auth/gmail.readonly` — read-only, no send/write access.
-
-The OAuth Client ID will need to be added. Since it's a publishable client ID (safe to embed in frontend), it goes directly in the codebase as `VITE_GOOGLE_CLIENT_ID`.
-
-The user will need to create a Google Cloud OAuth 2.0 Client ID with:
-- Authorized JavaScript origins: their Lovable preview URL + published URL
-- Authorized redirect URIs: same origins (GIS implicit flow uses postMessage, not redirects)
+### Phase 3: Inbox Page (`/inbox`)
+- 3-pane layout:
+  - **Left**: Filters (Status, Office, Persona, Tags, Risk Flags) + Search bar
+  - **Center**: Ticket list cards (fromName, subject, office, persona, tags, risk badge, status pill)
+  - Clicking a ticket navigates to `/ticket/:id`
 
 ---
 
-## Graceful degradation
-All Gmail features degrade gracefully: if no Google token is present, the app functions exactly as before (mock data, mock drafts). The Gmail features are additive enhancements, not hard dependencies.
+### Phase 4: Ticket Page (`/ticket/:id`)
+- 3-pane layout:
+  - **Left panel**: Metadata (office, persona, status, tags, risk flags), assign dropdown, internal note input
+  - **Center**: Full email thread with regex-based sensitive data highlighting (SSN, DOB patterns, etc.)
+  - **Right panel**: AI Draft editor (editable textarea, tone adjustment buttons: Shorten / More Formal / More Warm / Add Bullet List), evidence section (sources, examples, confidence score), escalation banner (yellow) when triggers matched
+- **Sticky bottom bar**: Approve & Send | Edit & Send | Reject | Create Draft in Gmail/Outlook (all mock)
+
+---
+
+### Phase 5: Mock Draft Generation
+- `generateDraft(ticket, office, rulebook, persona)` function:
+  - Builds greeting → acknowledgement → answer → next steps → closing → signature
+  - Injects `approvedPhrases`, `requiredDisclaimers`, `requiredLinks` based on topic matching
+  - Respects `hardConstraints` (filters forbidden phrases)
+  - Checks `escalationTriggers` → sets riskFlags if matched
+  - Populates `sourcesUsed` (mock), `confidenceScore` (realistic random)
+- Tone adjustment buttons call modifier functions on existing draft text
+
+---
+
+### Phase 6: Settings Page (`/settings`)
+- Connected mailbox display with Disconnect button
+- Delete all drafts & decisions button (with confirmation)
+- Data retention toggle (mock)
+
+---
+
+### Design System
+- Clean modern admin dashboard aesthetic
+- Color palette: neutral grays + blue primary + amber for warnings/risk flags + green for approved/sent
+- Status pills with distinct colors per status
+- Risk flag badges in amber/red
+- Sidebar navigation (collapsible) with icons for Inbox, Settings
+- Responsive 3-pane layouts with proper scroll areas

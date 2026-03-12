@@ -1,10 +1,16 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, MailboxConnection, School, Office, Persona, Ticket, Draft, Decision } from '../types';
+import React, { createContext, useContext, useState } from 'react';
+import { User, MailboxConnection, School, Office, Persona, Ticket, Draft, Decision, GoogleOAuthSession } from '../types';
 import {
   users, mailboxConnections as seedMailbox, schools, offices, personas,
   tickets as seedTickets, drafts as seedDrafts, decisions as seedDecisions,
   getTicketById as dbGetTicketById,
 } from '../data/mockDb';
+import {
+  signInWithGoogle,
+  revokeGoogleToken,
+  loadSession,
+  clearSession,
+} from '../lib/googleAuth';
 
 interface AppState {
   currentUser: User | null;
@@ -13,6 +19,7 @@ interface AppState {
   drafts: Draft[];
   decisions: Decision[];
   isAuthenticated: boolean;
+  googleSession: GoogleOAuthSession | null;
 }
 
 interface AppContextType extends AppState {
@@ -28,6 +35,8 @@ interface AppContextType extends AppState {
   getDraftForTicket: (ticketId: string) => Draft | undefined;
   saveDecision: (decision: Decision) => void;
   clearAllDraftsAndDecisions: () => void;
+  connectGoogle: () => Promise<GoogleOAuthSession>;
+  revokeGoogle: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -44,6 +53,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [ticketList, setTicketList] = useState<Ticket[]>(seedTickets);
   const [draftList, setDraftList] = useState<Draft[]>(seedDrafts);
   const [decisionList, setDecisionList] = useState<Decision[]>(seedDecisions);
+  const [googleSession, setGoogleSession] = useState<GoogleOAuthSession | null>(() => loadSession());
 
   const login = (email: string, password: string): boolean => {
     const user = users.find(u => u.email === email);
@@ -58,8 +68,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logout = () => {
     setCurrentUser(null);
     setMailboxConnection(null);
+    setGoogleSession(null);
     sessionStorage.removeItem('campusreply_user');
     sessionStorage.removeItem('campusreply_mailbox');
+    clearSession();
   };
 
   const connectMailbox = (provider: 'gmail' | 'outlook') => {
@@ -80,6 +92,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setMailboxConnection(updated);
       sessionStorage.setItem('campusreply_mailbox', JSON.stringify(updated));
     }
+  };
+
+  const connectGoogle = async (): Promise<GoogleOAuthSession> => {
+    const session = await signInWithGoogle();
+    setGoogleSession(session);
+    // Also connect the mailbox provider as gmail
+    connectMailbox('gmail');
+    return session;
+  };
+
+  const revokeGoogle = async (): Promise<void> => {
+    if (googleSession) {
+      await revokeGoogleToken(googleSession.accessToken);
+    }
+    setGoogleSession(null);
   };
 
   const getSchool = (id: string) => schools.find(s => s.id === id);
@@ -121,10 +148,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       drafts: draftList,
       decisions: decisionList,
       isAuthenticated: !!currentUser,
+      googleSession,
       login,
       logout,
       connectMailbox,
       disconnectMailbox,
+      connectGoogle,
+      revokeGoogle,
       getSchool,
       getOffice,
       getPersona,
