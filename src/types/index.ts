@@ -74,6 +74,15 @@ export interface MailboxConnection {
   lastSyncAt: string;
 }
 
+/** Google OAuth session — access token + basic profile only. No email bodies stored. */
+export interface GoogleOAuthSession {
+  accessToken: string;
+  expiresAt: number; // Unix ms
+  userEmail: string;
+  userName: string;
+  userPicture?: string;
+}
+
 export type TicketStatus = 'needs_review' | 'approved' | 'rejected' | 'assigned' | 'sent';
 
 export interface ThreadMessage {
