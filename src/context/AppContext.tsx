@@ -58,6 +58,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [draftList, setDraftList] = useState<Draft[]>(seedDrafts);
   const [decisionList, setDecisionList] = useState<Decision[]>(seedDecisions);
   const [googleSession, setGoogleSession] = useState<GoogleOAuthSession | null>(() => loadSession());
+  const [routingRules, setRoutingRules] = useState<RoutingRule[]>([
+    { id: 'rule-1', keywords: ['FAFSA', 'financial aid', 'tuition', 'scholarship', 'grant'], targetDepartment: 'Financial Aid Office', reason: 'Topics relating to tuition costs, financial assistance, FAFSA, grants, or scholarships belong to Financial Aid.' },
+    { id: 'rule-2', keywords: ['transcript', 'enrollment', 'graduation', 'degree audit', 'credits'], targetDepartment: "Registrar's Office", reason: 'Academic records, enrollment verification, transcripts, and degree requirements are handled by the Registrar.' },
+    { id: 'rule-3', keywords: ['password reset', 'login', 'VPN', 'wifi', 'portal access', 'IT'], targetDepartment: 'IT Help Desk', reason: 'Technical issues, account access, and campus system problems should be routed to IT support.' },
+  ]);
 
   const login = (email: string, password: string): boolean => {
     const user = users.find(u => u.email === email);
