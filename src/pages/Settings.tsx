@@ -249,6 +249,26 @@ export default function Settings() {
           </CardContent>
         </Card>
 
+        {/* Routing Rules */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <GitMerge className="w-4 h-4 text-primary" /> Routing Rules
+            </CardTitle>
+            <CardDescription>Configure keyword-based rules that auto-suggest routing to the right department</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Define which keywords trigger routing suggestions to Financial Aid, Registrar, IT, and other offices via the Layer 3 intelligence engine.
+              </p>
+              <Button variant="outline" size="sm" className="ml-4 shrink-0 gap-1.5" onClick={() => navigate('/settings/routing')}>
+                Manage <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Rulebook */}
         <Card>
           <CardHeader>
