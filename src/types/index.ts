@@ -117,6 +117,13 @@ export interface Draft {
   confidenceScore: number;
 }
 
+export interface RoutingRule {
+  id: string;
+  keywords: string[];
+  targetDepartment: string;
+  reason: string;
+}
+
 export type DecisionAction = 'approve_send' | 'edit_send' | 'reject' | 'assign';
 
 export interface Decision {
