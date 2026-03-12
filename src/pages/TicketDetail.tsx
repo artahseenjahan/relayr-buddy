@@ -353,9 +353,9 @@ export default function TicketDetail() {
 
                 <div className="p-3 border-b border-border space-y-2 shrink-0">
                   <div className="flex items-center justify-between">
-                    <Button onClick={handleGenerate} disabled={generating} size="sm" className="flex-1 gap-1.5">
+                    <Button onClick={handleGenerate} disabled={generating || gmailSearching} size="sm" className="flex-1 gap-1.5">
                       <Sparkles className="w-3.5 h-3.5" />
-                      {generating ? 'Generating…' : draft ? 'Regenerate Draft' : 'Generate Draft'}
+                      {gmailSearching ? 'Searching Gmail history…' : generating ? 'Generating…' : draft ? 'Regenerate Draft' : 'Generate Draft'}
                     </Button>
                     {draft && (
                       <span className="text-xs text-muted-foreground ml-2">
@@ -363,6 +363,12 @@ export default function TicketDetail() {
                       </span>
                     )}
                   </div>
+                  {googleSession && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground px-0.5">
+                      <History className="w-3 h-3 text-primary" />
+                      Gmail history active — draft will be personalised from your sent mail
+                    </div>
+                  )}
                   {draftBody && (
                     <div className="grid grid-cols-2 gap-1.5">
                       {[
