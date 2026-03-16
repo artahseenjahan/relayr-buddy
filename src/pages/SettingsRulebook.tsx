@@ -151,14 +151,19 @@ const ScoreBar = ({ value, label }: { value: number; label: string }) => (
 );
 
 // ─── Gmail Tone Demo Panel ────────────────────────────────────────────────────
-type GmailStep = 'idle' | 'loading' | 'selecting' | 'extracting' | 'preview';
+type GmailStep = 'role_select' | 'idle' | 'loading' | 'selecting' | 'extracting' | 'preview';
+
+// All office options — not limited to admissions
+const OFFICE_OPTIONS = offices.map(o => ({ value: o.id, label: o.name, description: o.description }));
 
 function GmailToneDemoPanel() {
   const { googleSession, connectGoogle } = useApp();
-  const navigate = useNavigate();
 
   const [expanded, setExpanded] = useState(false);
-  const [step, setStep] = useState<GmailStep>('idle');
+  const [step, setStep] = useState<GmailStep>('role_select');
+  const [selectedOfficeId, setSelectedOfficeId] = useState<string>('');
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string>('');
+  const [customRole, setCustomRole] = useState<string>('');
   const [emails, setEmails] = useState<GmailMessageMeta[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [profile, setProfile] = useState<ExtractedPersonaProfile | null>(null);
@@ -166,6 +171,10 @@ function GmailToneDemoPanel() {
   const [connecting, setConnecting] = useState(false);
 
   const MAX = 30;
+
+  // Personas filtered by selected office
+  const officePersonas = personas.filter(p => p.officeId === selectedOfficeId);
+  const selectedOffice = offices.find(o => o.id === selectedOfficeId);
 
   const handleConnect = async () => {
     setConnecting(true);
