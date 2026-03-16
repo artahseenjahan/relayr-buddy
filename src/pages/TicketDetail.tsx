@@ -392,6 +392,33 @@ export default function TicketDetail() {
                       Gmail history active — draft will be personalised from your sent mail
                     </div>
                   )}
+                  {/* Insert Available Slots */}
+                  {calendarConnection?.status === 'connected' && (
+                    <div className="space-y-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleInsertSlots}
+                        disabled={insertingSlots}
+                        className="w-full gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/5"
+                      >
+                        {insertingSlots
+                          ? <><Loader2 className="w-3 h-3 animate-spin" /> Fetching slots…</>
+                          : <><CalendarDays className="w-3 h-3" /> Insert Available Slots</>
+                        }
+                      </Button>
+                      {slotInsertError && (
+                        <p className="text-[10px] text-destructive px-1">{slotInsertError}</p>
+                      )}
+                    </div>
+                  )}
+                  {!calendarConnection || calendarConnection.status !== 'connected' ? (
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground px-0.5">
+                      <CalendarDays className="w-3 h-3" />
+                      <a href="/settings/calendar" className="hover:underline text-primary">Connect Calendar</a>
+                      {' '}to suggest available meeting slots
+                    </div>
+                  ) : null}
                   {draftBody && (
                     <div className="grid grid-cols-2 gap-1.5">
                       {[
