@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   BookOpen, Shield, User, ChevronDown, ChevronUp, Trash2,
   Sparkles, Mail, ShieldCheck, AlertCircle, RefreshCw,
-  CheckCircle2, RotateCcw, ArrowLeft, Info,
+  CheckCircle2, RotateCcw, Info, Building2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,9 +15,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { type ParsedRulebookLayers } from '@/lib/rulebookParser';
 import { fetchSentEmails, GmailMessageMeta } from '@/lib/gmailApi';
 import { extractPersonaFromEmails, ExtractedPersonaProfile } from '@/lib/personaExtractor';
+import { offices, personas } from '@/data/mockDb';
 
 interface MergedEntry {
   fileName: string;
