@@ -159,7 +159,7 @@ export default function SetupPersona() {
                 <Sparkles className="w-4 h-4 text-primary shrink-0" />
                 <div className="flex-1">
                   <div className="text-sm font-semibold text-foreground">Calibrate Persona from Gmail</div>
-                  <div className="text-xs text-muted-foreground">Auto-extract your tone & phrases from up to 25 sent emails (snippets only, never full text)</div>
+                  <div className="text-xs text-muted-foreground">Select your office &amp; role, then auto-extract tone from up to 30 sent emails (snippets only)</div>
                 </div>
                 {googleSession && (
                   <span className="text-[10px] bg-primary/15 text-primary px-2 py-0.5 rounded-full font-medium">Connected</span>
@@ -169,14 +169,87 @@ export default function SetupPersona() {
 
               {gmailExpanded && (
                 <div className="border-t border-primary/20 p-4 space-y-4">
-                  {!googleSession ? (
+
+                  {/* ── Office / role selector step ── */}
+                  {gmailStep === 'office_select' && (
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-lg bg-muted text-xs text-muted-foreground">
+                        <p className="font-medium text-foreground flex items-center gap-1.5 mb-1">
+                          <Building2 className="w-3.5 h-3.5 text-primary" />
+                          Which office are you calibrating for?
+                        </p>
+                        <p>CampusReply serves all administrative offices — select yours so the tone analysis reflects your specific communication context.</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Your Office</Label>
+                        <Select value={gmailOfficeId} onValueChange={v => { setGmailOfficeId(v); setGmailPersonaId(''); }}>
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue placeholder="Select office…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {offices.map(o => (
+                              <SelectItem key={o.id} value={o.id}>
+                                <div className="flex flex-col">
+                                  <span>{o.name}</span>
+                                  <span className="text-[10px] text-muted-foreground">{o.description}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {gmailOfficeId && (
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Your Role</Label>
+                          {officePersonas.length > 0 ? (
+                            <Select value={gmailPersonaId} onValueChange={setGmailPersonaId}>
+                              <SelectTrigger className="h-9 text-sm">
+                                <SelectValue placeholder="Select role…" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {officePersonas.map(p => (
+                                  <SelectItem key={p.id} value={p.id}>
+                                    {p.roleTitle} <span className="text-muted-foreground text-[10px]">· Level {p.authorityLevel}</span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <input
+                              value={gmailCustomRole}
+                              onChange={e => setGmailCustomRole(e.target.value)}
+                              placeholder="e.g. Front Office Coordinator"
+                              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                            />
+                          )}
+                        </div>
+                      )}
+                      <Button size="sm" className="w-full" disabled={!canProceed} onClick={() => setGmailStep('idle')}>
+                        Continue to Email Selection →
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Breadcrumb for post-selection steps */}
+                  {gmailStep !== 'office_select' && (
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <button type="button" onClick={() => setGmailStep('office_select')} className="text-primary hover:underline">Change role</button>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-muted-foreground">{offices.find(o => o.id === gmailOfficeId)?.name}</span>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="font-medium text-foreground">{gmailRoleLabel}</span>
+                    </div>
+                  )}
+
+                  {gmailStep !== 'office_select' && !googleSession && (
                     <div className="flex items-start gap-2 text-xs text-muted-foreground">
                       <AlertCircle className="w-4 h-4 shrink-0 text-muted-foreground mt-0.5" />
-                      <span>Connect your Gmail account first on the <a href="/connect-email" className="text-primary hover:underline">email connection page</a> to enable persona calibration.</span>
+                      <span>Connect your Gmail account in <a href="/settings" className="text-primary hover:underline">Settings → Google Account</a> to enable calibration.</span>
                     </div>
-                  ) : (
+                  )}
+
+                  {gmailStep !== 'office_select' && googleSession && (
                     <>
-                      {/* Connected badge */}
                       <div className="flex items-center gap-2 text-xs">
                         <Mail className="w-3.5 h-3.5 text-primary" />
                         <span className="text-muted-foreground">Connected as</span>
@@ -192,7 +265,7 @@ export default function SetupPersona() {
 
                       {gmailStep === 'idle' && (
                         <Button type="button" size="sm" className="w-full gap-1.5" onClick={loadGmailEmails}>
-                          <Mail className="w-3.5 h-3.5" /> Load My Recent Sent Emails
+                          <Mail className="w-3.5 h-3.5" /> Load My 30 Most Recent Sent Emails
                         </Button>
                       )}
 
@@ -206,7 +279,7 @@ export default function SetupPersona() {
                       {gmailStep === 'extracting' && (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
                           <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                          Analysing communication patterns…
+                          Analysing patterns for <strong className="text-foreground">{gmailRoleLabel}</strong>…
                         </div>
                       )}
 
@@ -214,28 +287,19 @@ export default function SetupPersona() {
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
                             <p className="text-xs text-muted-foreground">
-                              Select up to 25 emails to analyse. <span className="font-medium text-foreground">{selectedIds.size}/25 selected</span>
+                              Select up to 30 emails. <span className="font-medium text-foreground">{selectedIds.size}/30 selected</span>
                             </p>
-                            <Button
-                              type="button"
-                              size="sm"
-                              disabled={selectedIds.size === 0}
-                              onClick={handleExtract}
-                              className="gap-1.5 text-xs h-7"
-                            >
+                            <Button type="button" size="sm" disabled={selectedIds.size === 0} onClick={handleExtract} className="gap-1.5 text-xs h-7">
                               <Sparkles className="w-3 h-3" /> Extract Persona
                             </Button>
                           </div>
                           <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
                             {gmailEmails.map(email => (
-                              <label
-                                key={email.id}
-                                className={`flex items-start gap-2.5 p-2 rounded cursor-pointer hover:bg-accent transition-colors ${selectedIds.has(email.id) ? 'bg-primary/10 border border-primary/20' : 'border border-transparent'}`}
-                              >
+                              <label key={email.id} className={`flex items-start gap-2.5 p-2 rounded cursor-pointer hover:bg-accent transition-colors ${selectedIds.has(email.id) ? 'bg-primary/10 border border-primary/20' : 'border border-transparent'}`}>
                                 <Checkbox
                                   checked={selectedIds.has(email.id)}
                                   onCheckedChange={() => toggleSelect(email.id)}
-                                  disabled={!selectedIds.has(email.id) && selectedIds.size >= 25}
+                                  disabled={!selectedIds.has(email.id) && selectedIds.size >= 30}
                                   className="mt-0.5 shrink-0"
                                 />
                                 <div className="min-w-0">
@@ -255,7 +319,7 @@ export default function SetupPersona() {
                       {gmailStep === 'preview' && extractedProfile && (
                         <div className="space-y-3">
                           <div className="p-3 rounded-lg bg-muted space-y-2">
-                            <p className="text-xs font-semibold text-foreground">Extraction Results</p>
+                            <p className="text-xs font-semibold text-foreground">Extraction Results · {gmailRoleLabel}</p>
                             <p className="text-[10px] text-muted-foreground">{extractedProfile.styleSummary}</p>
                             <div className="space-y-1.5 pt-1">
                               <ScoreBar value={extractedProfile.formalityScore} label="Formality" />
@@ -263,49 +327,27 @@ export default function SetupPersona() {
                               <ScoreBar value={extractedProfile.conciseScore} label="Conciseness" />
                             </div>
                           </div>
-
                           <div className="p-3 rounded-lg bg-muted space-y-1.5">
                             <p className="text-xs font-medium">Detected Style</p>
                             <div className="flex gap-2 flex-wrap text-[10px]">
-                              <span className="px-2 py-0.5 rounded-full bg-primary/15 text-primary font-medium">
-                                Tone: {extractedProfile.toneDefault.replace('-', ' ')}
-                              </span>
-                              <span className="px-2 py-0.5 rounded-full bg-accent text-accent-foreground">
-                                Opens with: {extractedProfile.dominantSalutation}
-                              </span>
-                              <span className="px-2 py-0.5 rounded-full bg-accent text-accent-foreground">
-                                Closes with: {extractedProfile.dominantClosing}
-                              </span>
+                              <span className="px-2 py-0.5 rounded-full bg-primary/15 text-primary font-medium">Tone: {extractedProfile.toneDefault.replace('-', ' ')}</span>
+                              <span className="px-2 py-0.5 rounded-full bg-accent text-accent-foreground">Opens: {extractedProfile.dominantSalutation}</span>
+                              <span className="px-2 py-0.5 rounded-full bg-accent text-accent-foreground">Closes: {extractedProfile.dominantClosing}</span>
                             </div>
                           </div>
-
                           {extractedProfile.approvedPhrases.length > 0 && (
                             <div className="space-y-1">
                               <p className="text-xs font-medium">Recurring Phrases</p>
                               {extractedProfile.approvedPhrases.slice(0, 4).map((p, i) => (
-                                <div key={i} className="text-[10px] text-muted-foreground bg-muted rounded px-2 py-1 truncate">
-                                  "{p}"
-                                </div>
+                                <div key={i} className="text-[10px] text-muted-foreground bg-muted rounded px-2 py-1 truncate">"{p}"</div>
                               ))}
                             </div>
                           )}
-
                           <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="flex-1 gap-1.5"
-                              onClick={applyExtractedProfile}
-                            >
+                            <Button type="button" size="sm" className="flex-1 gap-1.5" onClick={applyExtractedProfile}>
                               <CheckCircle2 className="w-3.5 h-3.5" /> Apply to Persona
                             </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setGmailStep('selecting')}
-                              className="gap-1.5"
-                            >
+                            <Button type="button" variant="outline" size="sm" onClick={() => setGmailStep('selecting')} className="gap-1.5">
                               Re-select
                             </Button>
                           </div>
