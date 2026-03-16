@@ -8,11 +8,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { UserCircle, Plus, X, CheckCircle2, Sparkles, Mail, ShieldCheck, AlertCircle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { UserCircle, Plus, X, CheckCircle2, Sparkles, Mail, ShieldCheck, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Building2 } from 'lucide-react';
 import OnboardingLayout from '../components/OnboardingLayout';
 import { ToneDefault } from '../types';
 import { fetchSentEmails, GmailMessageMeta } from '../lib/gmailApi';
 import { extractPersonaFromEmails, ExtractedPersonaProfile } from '../lib/personaExtractor';
+import { offices, personas as allPersonas } from '../data/mockDb';
 
 const ListField = ({ label, items, onChange, placeholder }: { label: string; items: string[]; onChange: (items: string[]) => void; placeholder?: string }) => {
   const [input, setInput] = useState('');
