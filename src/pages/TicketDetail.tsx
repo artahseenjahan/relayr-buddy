@@ -162,6 +162,25 @@ export default function TicketDetail() {
 
   const applyToneModifier = (fn: (body: string) => string) => setDraftBody(prev => fn(prev));
 
+  const handleInsertSlots = async () => {
+    setInsertingSlots(true);
+    setSlotInsertError(null);
+    try {
+      if (!googleSession) throw new Error('No Google session active');
+      const slots = await getFreeBusySlots(googleSession.accessToken);
+      if (slots.length === 0) {
+        setSlotInsertError('No free slots found in the next 7 business days.');
+        return;
+      }
+      const block = buildAvailabilityText(slots);
+      setDraftBody(prev => prev ? `${prev}\n\n${block}` : block);
+    } catch (err: any) {
+      setSlotInsertError(err?.message || 'Failed to fetch availability.');
+    } finally {
+      setInsertingSlots(false);
+    }
+  };
+
   const handleDecision = (action: Decision['action']) => {
     if (action === 'reject') {
       setShowRejectFeedback(true);
