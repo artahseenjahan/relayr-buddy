@@ -5,8 +5,15 @@
  * Tokens expire after 1 hour and are stored in sessionStorage only.
  */
 
-const SCOPES = [
+const GMAIL_SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
+  'openid',
+  'email',
+  'profile',
+].join(' ');
+
+const CALENDAR_SCOPES = [
+  'https://www.googleapis.com/auth/calendar.readonly',
   'openid',
   'email',
   'profile',
