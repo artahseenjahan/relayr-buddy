@@ -153,9 +153,6 @@ const ScoreBar = ({ value, label }: { value: number; label: string }) => (
 // ─── Gmail Tone Demo Panel ────────────────────────────────────────────────────
 type GmailStep = 'role_select' | 'idle' | 'loading' | 'selecting' | 'extracting' | 'preview';
 
-// All office options — not limited to admissions
-const OFFICE_OPTIONS = offices.map(o => ({ value: o.id, label: o.name, description: o.description }));
-
 function GmailToneDemoPanel() {
   const { googleSession, connectGoogle } = useApp();
 
@@ -175,6 +172,7 @@ function GmailToneDemoPanel() {
   // Personas filtered by selected office
   const officePersonas = personas.filter(p => p.officeId === selectedOfficeId);
   const selectedOffice = offices.find(o => o.id === selectedOfficeId);
+  const selectedPersona = personas.find(p => p.id === selectedPersonaId);
 
   const handleConnect = async () => {
     setConnecting(true);
