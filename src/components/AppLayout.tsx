@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { Inbox, Settings, GraduationCap, LogOut, User, ChevronLeft, ChevronRight, BookOpen, LayoutDashboard, GitMerge } from 'lucide-react';
+import { Inbox, Settings, GraduationCap, LogOut, User, ChevronLeft, ChevronRight, BookOpen, LayoutDashboard, GitMerge, CalendarDays } from 'lucide-react';
 import { useState } from 'react';
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { path: '/settings', icon: Settings, label: 'Settings' },
   { path: '/settings/rulebook', icon: BookOpen, label: 'Rulebook' },
   { path: '/settings/routing', icon: GitMerge, label: 'Routing Rules' },
+  { path: '/settings/calendar', icon: CalendarDays, label: 'Calendar' },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

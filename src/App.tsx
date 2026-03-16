@@ -16,6 +16,7 @@ import TicketDetail from "./pages/TicketDetail";
 import Settings from "./pages/Settings";
 import SettingsRulebook from "./pages/SettingsRulebook";
 import SettingsRouting from "./pages/SettingsRouting";
+import SettingsCalendar from "./pages/SettingsCalendar";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
