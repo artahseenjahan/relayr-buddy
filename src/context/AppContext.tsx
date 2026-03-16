@@ -57,6 +57,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const stored = sessionStorage.getItem('campusreply_mailbox');
     return stored ? JSON.parse(stored) : null;
   });
+  const [calendarConnection, setCalendarConnection] = useState<CalendarConnection | null>(() => {
+    const stored = sessionStorage.getItem('campusreply_calendar');
+    return stored ? JSON.parse(stored) : null;
+  });
   const [ticketList, setTicketList] = useState<Ticket[]>(seedTickets);
   const [draftList, setDraftList] = useState<Draft[]>(seedDrafts);
   const [decisionList, setDecisionList] = useState<Decision[]>(seedDecisions);
@@ -80,9 +84,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logout = () => {
     setCurrentUser(null);
     setMailboxConnection(null);
+    setCalendarConnection(null);
     setGoogleSession(null);
     sessionStorage.removeItem('campusreply_user');
     sessionStorage.removeItem('campusreply_mailbox');
+    sessionStorage.removeItem('campusreply_calendar');
     clearSession();
   };
 
@@ -106,10 +112,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const connectCalendar = async (): Promise<void> => {
+    // Reuse existing Google session if valid; otherwise trigger a new sign-in
+    let session = googleSession;
+    if (!session) {
+      session = await signInWithGoogle();
+      setGoogleSession(session);
+    }
+    const conn: CalendarConnection = {
+      id: `calendar-${Date.now()}`,
+      userId: currentUser?.id || 'user-1',
+      provider: 'google',
+      status: 'connected',
+      connectedAt: new Date().toISOString(),
+      userEmail: session.userEmail,
+    };
+    setCalendarConnection(conn);
+    sessionStorage.setItem('campusreply_calendar', JSON.stringify(conn));
+  };
+
+  const disconnectCalendar = () => {
+    setCalendarConnection(null);
+    sessionStorage.removeItem('campusreply_calendar');
+  };
+
   const connectGoogle = async (): Promise<GoogleOAuthSession> => {
     const session = await signInWithGoogle();
     setGoogleSession(session);
-    // Also connect the mailbox provider as gmail
     connectMailbox('gmail');
     return session;
   };
@@ -160,6 +189,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{
       currentUser,
       mailboxConnection,
+      calendarConnection,
       tickets: ticketList,
       drafts: draftList,
       decisions: decisionList,
@@ -170,6 +200,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       logout,
       connectMailbox,
       disconnectMailbox,
+      connectCalendar,
+      disconnectCalendar,
       connectGoogle,
       revokeGoogle,
       getSchool,
