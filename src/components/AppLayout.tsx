@@ -105,6 +105,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {location.pathname === '/settings' && 'Settings'}
             {location.pathname === '/settings/rulebook' && 'Rulebook & Responsibility Layers'}
             {location.pathname === '/settings/routing' && 'Routing Rules'}
+            {location.pathname === '/settings/calendar' && 'Calendar Integration'}
           </h1>
           {office && (
             <span className="text-xs text-muted-foreground border border-border px-2 py-0.5 rounded-full">
