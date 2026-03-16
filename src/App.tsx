@@ -16,6 +16,7 @@ import TicketDetail from "./pages/TicketDetail";
 import Settings from "./pages/Settings";
 import SettingsRulebook from "./pages/SettingsRulebook";
 import SettingsRouting from "./pages/SettingsRouting";
+import SettingsCalendar from "./pages/SettingsCalendar";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -47,6 +48,7 @@ const AppRoutes = () => {
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/settings/rulebook" element={<ProtectedRoute><SettingsRulebook /></ProtectedRoute>} />
       <Route path="/settings/routing" element={<ProtectedRoute><SettingsRouting /></ProtectedRoute>} />
+      <Route path="/settings/calendar" element={<ProtectedRoute><SettingsCalendar /></ProtectedRoute>} />
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -124,6 +124,18 @@ export interface RoutingRule {
   reason: string;
 }
 
+export type CalendarProvider = 'google' | 'outlook';
+export type CalendarConnectionStatus = 'connected' | 'disconnected';
+
+export interface CalendarConnection {
+  id: string;
+  userId: string;
+  provider: CalendarProvider;
+  status: CalendarConnectionStatus;
+  connectedAt: string;
+  userEmail: string;
+}
+
 export type DecisionAction = 'approve_send' | 'edit_send' | 'reject' | 'assign';
 
 export interface Decision {

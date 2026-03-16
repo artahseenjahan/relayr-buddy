@@ -5,8 +5,15 @@
  * Tokens expire after 1 hour and are stored in sessionStorage only.
  */
 
-const SCOPES = [
+const GMAIL_SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
+  'openid',
+  'email',
+  'profile',
+].join(' ');
+
+const CALENDAR_SCOPES = [
+  'https://www.googleapis.com/auth/calendar.readonly',
   'openid',
   'email',
   'profile',
@@ -101,7 +108,7 @@ export async function signInWithGoogle(): Promise<GoogleOAuthSession> {
   return new Promise((resolve, reject) => {
     const client = (window as any).google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: SCOPES,
+      scope: GMAIL_SCOPES,
       callback: async (response: any) => {
         if (response.error) {
           reject(new Error(response.error_description || response.error));

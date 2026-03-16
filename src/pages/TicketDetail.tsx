@@ -5,6 +5,7 @@ import { offices, personas, getRulebookByOfficeId } from '../data/mockDb';
 import { generateDraft, shortenDraft, makeMoreFormal, makeMoreWarm, addBulletList } from '../lib/draftGenerator';
 import { buildIntelligenceReport, IntelligenceReport } from '../lib/intelligenceEngine';
 import { searchGmailSent, extractTicketKeywords } from '../lib/gmailApi';
+import { getFreeBusySlots, buildAvailabilityText } from '../lib/calendarApi';
 import { Decision } from '../types';
 import AppLayout from '../components/AppLayout';
 import IntelligencePanel from '../components/IntelligencePanel';
@@ -16,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AlertTriangle, Sparkles, CheckCircle2, X, Edit3, Mail, ArrowLeft,
   Tag, Flag, MessageSquare, BookOpen, BarChart2, Brain, RefreshCw,
-  ArrowRightCircle, RotateCcw, History
+  ArrowRightCircle, RotateCcw, History, CalendarDays, Loader2
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 
@@ -60,7 +61,7 @@ const STATUS_LABEL: Record<string, string> = {
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { tickets, updateTicket, saveDraft, getDraftForTicket, saveDecision, currentUser, googleSession } = useApp();
+  const { tickets, updateTicket, saveDraft, getDraftForTicket, saveDecision, currentUser, googleSession, calendarConnection } = useApp();
 
   const ticket = tickets.find(t => t.id === id);
   const existingDraft = getDraftForTicket(id || '');
@@ -76,6 +77,9 @@ export default function TicketDetail() {
   const [assignedTo, setAssignedTo] = useState('');
   const [intelligenceReport, setIntelligenceReport] = useState<IntelligenceReport | null>(null);
   const [rightTab, setRightTab] = useState<'draft' | 'intelligence'>('draft');
+
+  const [insertingSlots, setInsertingSlots] = useState(false);
+  const [slotInsertError, setSlotInsertError] = useState<string | null>(null);
 
   // Rejection feedback state
   const [showRejectFeedback, setShowRejectFeedback] = useState(false);
@@ -157,6 +161,25 @@ export default function TicketDetail() {
   };
 
   const applyToneModifier = (fn: (body: string) => string) => setDraftBody(prev => fn(prev));
+
+  const handleInsertSlots = async () => {
+    setInsertingSlots(true);
+    setSlotInsertError(null);
+    try {
+      if (!googleSession) throw new Error('No Google session active');
+      const slots = await getFreeBusySlots(googleSession.accessToken);
+      if (slots.length === 0) {
+        setSlotInsertError('No free slots found in the next 7 business days.');
+        return;
+      }
+      const block = buildAvailabilityText(slots);
+      setDraftBody(prev => prev ? `${prev}\n\n${block}` : block);
+    } catch (err: any) {
+      setSlotInsertError(err?.message || 'Failed to fetch availability.');
+    } finally {
+      setInsertingSlots(false);
+    }
+  };
 
   const handleDecision = (action: Decision['action']) => {
     if (action === 'reject') {
@@ -369,6 +392,33 @@ export default function TicketDetail() {
                       Gmail history active — draft will be personalised from your sent mail
                     </div>
                   )}
+                  {/* Insert Available Slots */}
+                  {calendarConnection?.status === 'connected' && (
+                    <div className="space-y-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleInsertSlots}
+                        disabled={insertingSlots}
+                        className="w-full gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/5"
+                      >
+                        {insertingSlots
+                          ? <><Loader2 className="w-3 h-3 animate-spin" /> Fetching slots…</>
+                          : <><CalendarDays className="w-3 h-3" /> Insert Available Slots</>
+                        }
+                      </Button>
+                      {slotInsertError && (
+                        <p className="text-[10px] text-destructive px-1">{slotInsertError}</p>
+                      )}
+                    </div>
+                  )}
+                  {!calendarConnection || calendarConnection.status !== 'connected' ? (
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground px-0.5">
+                      <CalendarDays className="w-3 h-3" />
+                      <a href="/settings/calendar" className="hover:underline text-primary">Connect Calendar</a>
+                      {' '}to suggest available meeting slots
+                    </div>
+                  ) : null}
                   {draftBody && (
                     <div className="grid grid-cols-2 gap-1.5">
                       {[
