@@ -108,7 +108,7 @@ export async function signInWithGoogle(): Promise<GoogleOAuthSession> {
   return new Promise((resolve, reject) => {
     const client = (window as any).google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: SCOPES,
+      scope: GMAIL_SCOPES,
       callback: async (response: any) => {
         if (response.error) {
           reject(new Error(response.error_description || response.error));

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
-import { User, MailboxConnection, School, Office, Persona, Ticket, Draft, Decision, GoogleOAuthSession, RoutingRule } from '../types';
+import { User, MailboxConnection, School, Office, Persona, Ticket, Draft, Decision, GoogleOAuthSession, RoutingRule, CalendarConnection } from '../types';
 import {
   users, mailboxConnections as seedMailbox, schools, offices, personas,
   tickets as seedTickets, drafts as seedDrafts, decisions as seedDecisions,
@@ -15,6 +15,7 @@ import {
 interface AppState {
   currentUser: User | null;
   mailboxConnection: MailboxConnection | null;
+  calendarConnection: CalendarConnection | null;
   tickets: Ticket[];
   drafts: Draft[];
   decisions: Decision[];
@@ -28,6 +29,8 @@ interface AppContextType extends AppState {
   logout: () => void;
   connectMailbox: (provider: 'gmail' | 'outlook') => void;
   disconnectMailbox: () => void;
+  connectCalendar: () => Promise<void>;
+  disconnectCalendar: () => void;
   getSchool: (id: string) => School | undefined;
   getOffice: (id: string) => Office | undefined;
   getPersona: (id: string) => Persona | undefined;
