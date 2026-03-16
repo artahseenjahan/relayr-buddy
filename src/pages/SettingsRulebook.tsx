@@ -193,7 +193,6 @@ function GmailToneDemoPanel() {
     try {
       const fetched = await fetchSentEmails(googleSession.accessToken, MAX);
       setEmails(fetched);
-      // auto-select first 10
       setSelected(new Set(fetched.slice(0, 10).map(e => e.id)));
       setStep('selecting');
     } catch (err: any) {
@@ -223,13 +222,365 @@ function GmailToneDemoPanel() {
     setStep('preview');
   };
 
-  const reset = () => {
-    setStep('idle');
+  const resetFull = () => {
+    setStep('role_select');
+    setSelectedOfficeId('');
+    setSelectedPersonaId('');
+    setCustomRole('');
     setEmails([]);
     setSelected(new Set());
     setProfile(null);
     setError(null);
   };
+
+  const canProceedFromRole = selectedOfficeId !== '' && (selectedPersonaId !== '' || customRole.trim() !== '');
+  const roleLabel = selectedPersona?.roleTitle || customRole || '—';
+
+  return (
+    <Card className="border-primary/25 overflow-hidden">
+      {/* Header toggle */}
+      <button
+        type="button"
+        onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-primary/5 transition-colors"
+      >
+        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+          <Sparkles className="w-4 h-4 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-foreground flex items-center gap-2">
+            Staff Persona · Tone Demo
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary">Layer 1</Badge>
+          </div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            Select your office &amp; role, then choose up to 30 sent emails — AI analyses your tone &amp; style (demo only)
+          </div>
+        </div>
+        {selectedOffice && step !== 'role_select' && (
+          <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-medium shrink-0 hidden sm:block">
+            {selectedOffice.name}
+          </span>
+        )}
+        {googleSession && (
+          <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium shrink-0">
+            Gmail connected
+          </span>
+        )}
+        {expanded
+          ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
+          : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+        }
+      </button>
+
+      {expanded && (
+        <div className="border-t border-primary/20">
+          {/* Privacy notice */}
+          <div className="flex items-start gap-2 px-4 py-2.5 bg-muted/60 text-[11px] text-muted-foreground">
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-primary mt-0.5" />
+            <span>
+              <strong className="text-foreground">Privacy:</strong> Only ~100-char snippets + subject lines are processed — never full bodies. Nothing is persisted. This is for tone-demo purposes only.
+            </span>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {error && (
+              <div className="flex items-start gap-2 p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                {error}
+              </div>
+            )}
+
+            {/* ── Step 0: Role selection ── */}
+            {step === 'role_select' && (
+              <div className="space-y-4">
+                <div className="p-3 rounded-lg bg-muted text-xs text-muted-foreground space-y-1">
+                  <p className="font-medium text-foreground flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-primary" />
+                    Which office do you work in?
+                  </p>
+                  <p>This platform supports all administrative offices across your institution — not just admissions. Select your office so the tone analysis is calibrated to your specific communication context.</p>
+                </div>
+
+                {/* Office selector */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Your Office</Label>
+                  <Select value={selectedOfficeId} onValueChange={v => { setSelectedOfficeId(v); setSelectedPersonaId(''); }}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="Select your office…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {offices.map(o => (
+                        <SelectItem key={o.id} value={o.id}>
+                          <div className="flex flex-col">
+                            <span>{o.name}</span>
+                            <span className="text-[10px] text-muted-foreground">{o.description}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Role/persona selector — appears once office is chosen */}
+                {selectedOfficeId && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">Your Role</Label>
+                    {officePersonas.length > 0 ? (
+                      <Select value={selectedPersonaId} onValueChange={setSelectedPersonaId}>
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue placeholder="Select your role…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {officePersonas.map(p => (
+                            <SelectItem key={p.id} value={p.id}>
+                              <div className="flex flex-col">
+                                <span>{p.roleTitle}</span>
+                                <span className="text-[10px] text-muted-foreground">Authority Level {p.authorityLevel} · {p.toneDefault.replace('-', ' ')}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        value={customRole}
+                        onChange={e => setCustomRole(e.target.value)}
+                        placeholder="e.g. Front Office Coordinator"
+                        className="h-9 text-sm"
+                      />
+                    )}
+                    {officePersonas.length > 0 && (
+                      <p className="text-[10px] text-muted-foreground">
+                        Not listed? Type your role manually:
+                        <Input value={customRole} onChange={e => setCustomRole(e.target.value)}
+                          placeholder="Custom role title…" className="mt-1 h-8 text-xs" />
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <Button
+                  size="sm"
+                  className="w-full gap-2"
+                  disabled={!canProceedFromRole}
+                  onClick={() => setStep('idle')}
+                >
+                  Continue to Email Selection →
+                </Button>
+              </div>
+            )}
+
+            {/* ── Breadcrumb for post-role steps ── */}
+            {step !== 'role_select' && selectedOffice && (
+              <div className="flex items-center gap-2 text-[11px]">
+                <button type="button" onClick={resetFull} className="text-primary hover:underline">Change role</button>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground">{selectedOffice.name}</span>
+                <span className="text-muted-foreground">·</span>
+                <span className="font-medium text-foreground">{roleLabel}</span>
+              </div>
+            )}
+
+            {/* ── Not connected (shown after role selected) ── */}
+            {step === 'idle' && !googleSession && (
+              <div className="space-y-3">
+                <div className="p-3 rounded-lg bg-muted text-xs text-muted-foreground space-y-1">
+                  <p className="font-medium text-foreground">How it works</p>
+                  <p>1. Connect your Google account (read-only, no send access).</p>
+                  <p>2. Your 30 most recent sent emails are loaded — subject + snippet only.</p>
+                  <p>3. Choose which emails to include in the analysis.</p>
+                  <p>4. The AI extracts tone, salutation patterns, and recurring phrases for your role.</p>
+                </div>
+                <Button
+                  size="sm"
+                  className="w-full gap-2"
+                  onClick={handleConnect}
+                  disabled={connecting}
+                >
+                  {connecting
+                    ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Connecting…</>
+                    : <><Mail className="w-3.5 h-3.5" /> Connect Gmail to Start</>
+                  }
+                </Button>
+              </div>
+            )}
+
+            {/* ── Connected, idle ── */}
+            {step === 'idle' && googleSession && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted">
+                  {googleSession.userPicture
+                    ? <img src={googleSession.userPicture} alt="" className="w-7 h-7 rounded-full border border-border" />
+                    : <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">{googleSession.userName?.[0] || 'G'}</div>
+                  }
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium text-foreground">{googleSession.userName}</div>
+                    <div className="text-[10px] text-muted-foreground">{googleSession.userEmail}</div>
+                  </div>
+                  <CheckCircle2 className="w-4 h-4 text-[hsl(var(--status-approved))] ml-auto shrink-0" />
+                </div>
+                <Button size="sm" className="w-full gap-2" onClick={loadEmails}>
+                  <Mail className="w-3.5 h-3.5" /> Load My 30 Most Recent Sent Emails
+                </Button>
+              </div>
+            )}
+
+            {/* ── Loading ── */}
+            {step === 'loading' && (
+              <div className="flex flex-col items-center gap-3 py-6 text-center">
+                <RefreshCw className="w-6 h-6 animate-spin text-primary" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Fetching your sent emails…</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Loading subject lines and snippets only</p>
+                </div>
+              </div>
+            )}
+
+            {/* ── Selecting ── */}
+            {step === 'selecting' && emails.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-foreground">{selected.size}/{MAX} selected</span>
+                    <div className="h-1 w-24 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(selected.size / MAX) * 100}%` }} />
+                    </div>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={clearAll}>Clear all</Button>
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={selectAll}>Select 30</Button>
+                    <Button type="button" size="sm" className="h-7 text-xs gap-1.5" disabled={selected.size === 0} onClick={handleExtract}>
+                      <Sparkles className="w-3 h-3" />
+                      Analyse {selected.size > 0 ? `(${selected.size})` : ''}
+                    </Button>
+                  </div>
+                </div>
+                <div className="max-h-72 overflow-y-auto rounded-lg border border-border divide-y divide-border">
+                  {emails.map((email, idx) => {
+                    const isSelected = selected.has(email.id);
+                    const isDisabled = !isSelected && selected.size >= MAX;
+                    return (
+                      <label key={email.id} className={`flex items-start gap-3 px-3 py-2.5 cursor-pointer transition-colors select-none ${isSelected ? 'bg-primary/8' : 'hover:bg-muted/60'} ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                        <Checkbox checked={isSelected} onCheckedChange={() => !isDisabled && toggle(email.id)} disabled={isDisabled} className="mt-0.5 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-muted-foreground/60 w-5 shrink-0">#{idx + 1}</span>
+                            <span className="text-xs font-medium text-foreground truncate">{email.subject}</span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1 pl-7">{email.snippet}</p>
+                        </div>
+                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />}
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <Info className="w-3 h-3 text-muted-foreground/60" />
+                  {emails.length} emails loaded · snippets are ~100 chars · no full bodies processed
+                </div>
+              </div>
+            )}
+
+            {/* ── Extracting ── */}
+            {step === 'extracting' && (
+              <div className="flex flex-col items-center gap-3 py-8 text-center">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-primary animate-pulse" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Analysing communication patterns…</p>
+                  <p className="text-xs text-muted-foreground mt-1">Extracting tone, salutation style, and recurring phrases for <strong>{roleLabel}</strong></p>
+                </div>
+              </div>
+            )}
+
+            {/* ── Preview ── */}
+            {step === 'preview' && profile && (
+              <div className="space-y-4">
+                <div className="p-3 rounded-lg bg-muted space-y-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-[hsl(var(--status-approved))] shrink-0" />
+                    <p className="text-xs font-semibold text-foreground">Tone Analysis Complete</p>
+                    <Badge variant="outline" className="ml-auto text-[10px]">
+                      {selected.size} email{selected.size !== 1 ? 's' : ''} analysed
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">{profile.styleSummary}</p>
+                </div>
+                <div className="p-3 rounded-lg border border-border space-y-2.5">
+                  <p className="text-xs font-semibold text-foreground mb-1">Communication Scores · {roleLabel}</p>
+                  <ScoreBar value={profile.formalityScore} label="Formality" />
+                  <ScoreBar value={profile.warmthScore}    label="Warmth" />
+                  <ScoreBar value={profile.conciseScore}   label="Conciseness" />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-foreground">Detected Style</p>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium">
+                      <Sparkles className="w-3 h-3" />
+                      Tone: {profile.toneDefault.replace('-', ' ')}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
+                      <Mail className="w-3 h-3" /> Opens: {profile.dominantSalutation}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
+                      <Mail className="w-3 h-3" /> Closes: {profile.dominantClosing}
+                    </span>
+                  </div>
+                </div>
+                {profile.approvedPhrases.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-foreground">Recurring Professional Phrases</p>
+                    <div className="grid grid-cols-1 gap-1">
+                      {profile.approvedPhrases.map((phrase, i) => (
+                        <div key={i} className="flex items-start gap-2 text-[11px] bg-muted rounded-md px-3 py-1.5">
+                          <span className="text-primary font-bold shrink-0">"</span>
+                          <span className="text-foreground">{phrase}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {profile.safeLanguageTemplates.length > 0 && (
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <button className="w-full flex items-center justify-between text-xs font-semibold text-foreground px-1 py-1 hover:text-primary transition-colors">
+                        <span>Safe Language Templates ({profile.safeLanguageTemplates.length})</span>
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="space-y-2 mt-2">
+                        {profile.safeLanguageTemplates.map((t, i) => (
+                          <pre key={i} className="text-[10px] text-muted-foreground bg-muted rounded-md p-2.5 whitespace-pre-wrap font-sans leading-relaxed">{t}</pre>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+                <Separator />
+                <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" />
+                  <span>
+                    This is a <strong className="text-foreground">tone demo</strong> — results are for review only and not automatically applied to your persona. To apply these patterns, go to the <a href="/setup-persona" className="text-primary hover:underline">Persona Setup</a> page.
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => setStep('selecting')}>
+                    <RotateCcw className="w-3.5 h-3.5" /> Re-select
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={resetFull}>
+                    Start over
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
 
   return (
     <Card className="border-primary/25 overflow-hidden">
