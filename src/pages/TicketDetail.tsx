@@ -61,7 +61,7 @@ const STATUS_LABEL: Record<string, string> = {
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { tickets, updateTicket, saveDraft, getDraftForTicket, saveDecision, currentUser, googleSession } = useApp();
+  const { tickets, updateTicket, saveDraft, getDraftForTicket, saveDecision, currentUser, googleSession, calendarConnection } = useApp();
 
   const ticket = tickets.find(t => t.id === id);
   const existingDraft = getDraftForTicket(id || '');
@@ -77,6 +77,9 @@ export default function TicketDetail() {
   const [assignedTo, setAssignedTo] = useState('');
   const [intelligenceReport, setIntelligenceReport] = useState<IntelligenceReport | null>(null);
   const [rightTab, setRightTab] = useState<'draft' | 'intelligence'>('draft');
+
+  const [insertingSlots, setInsertingSlots] = useState(false);
+  const [slotInsertError, setSlotInsertError] = useState<string | null>(null);
 
   // Rejection feedback state
   const [showRejectFeedback, setShowRejectFeedback] = useState(false);
