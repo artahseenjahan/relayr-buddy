@@ -54,12 +54,19 @@ export default function SetupPersona() {
   const [safeLanguageTemplates, setSafeLanguageTemplates] = useState<string[]>([]);
 
   // Gmail calibration state
-  const [gmailStep, setGmailStep] = useState<'idle' | 'loading' | 'selecting' | 'extracting' | 'preview'>('idle');
+  const [gmailStep, setGmailStep] = useState<'office_select' | 'idle' | 'loading' | 'selecting' | 'extracting' | 'preview'>('office_select');
+  const [gmailOfficeId, setGmailOfficeId] = useState<string>('');
+  const [gmailPersonaId, setGmailPersonaId] = useState<string>('');
+  const [gmailCustomRole, setGmailCustomRole] = useState<string>('');
   const [gmailEmails, setGmailEmails] = useState<GmailMessageMeta[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [extractedProfile, setExtractedProfile] = useState<ExtractedPersonaProfile | null>(null);
   const [gmailError, setGmailError] = useState<string | null>(null);
   const [gmailExpanded, setGmailExpanded] = useState(false);
+
+  const officePersonas = allPersonas.filter(p => p.officeId === gmailOfficeId);
+  const gmailRoleLabel = allPersonas.find(p => p.id === gmailPersonaId)?.roleTitle || gmailCustomRole || '—';
+  const canProceed = gmailOfficeId !== '' && (gmailPersonaId !== '' || gmailCustomRole.trim() !== '');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
