@@ -108,7 +108,7 @@ export default function Settings() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Revoke Google Access?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will revoke CampusReply's access to your Gmail and clear the stored token. Draft personalisation and persona calibration from Gmail will no longer be available until you reconnect.
+                        This will revoke Relayr's access to your Gmail and clear the stored token. Draft personalisation and persona calibration from Gmail will no longer be available until you reconnect.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
