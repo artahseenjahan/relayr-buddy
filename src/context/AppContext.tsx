@@ -133,7 +133,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const disconnectCalendar = () => {
     setCalendarConnection(null);
-    sessionStorage.removeItem('campusreply_calendar');
+    sessionStorage.removeItem('relayr_calendar');
   };
 
   const connectGoogle = async (): Promise<GoogleOAuthSession> => {
