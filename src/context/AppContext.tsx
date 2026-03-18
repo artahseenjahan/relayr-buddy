@@ -108,7 +108,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (mailboxConnection) {
       const updated = { ...mailboxConnection, status: 'disconnected' as const };
       setMailboxConnection(updated);
-      sessionStorage.setItem('campusreply_mailbox', JSON.stringify(updated));
+      sessionStorage.setItem('relayr_mailbox', JSON.stringify(updated));
     }
   };
 
