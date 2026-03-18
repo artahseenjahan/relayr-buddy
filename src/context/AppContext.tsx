@@ -50,15 +50,15 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const stored = sessionStorage.getItem('campusreply_user');
+    const stored = sessionStorage.getItem('relayr_user');
     return stored ? JSON.parse(stored) : null;
   });
   const [mailboxConnection, setMailboxConnection] = useState<MailboxConnection | null>(() => {
-    const stored = sessionStorage.getItem('campusreply_mailbox');
+    const stored = sessionStorage.getItem('relayr_mailbox');
     return stored ? JSON.parse(stored) : null;
   });
   const [calendarConnection, setCalendarConnection] = useState<CalendarConnection | null>(() => {
-    const stored = sessionStorage.getItem('campusreply_calendar');
+    const stored = sessionStorage.getItem('relayr_calendar');
     return stored ? JSON.parse(stored) : null;
   });
   const [ticketList, setTicketList] = useState<Ticket[]>(seedTickets);
