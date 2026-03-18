@@ -86,9 +86,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMailboxConnection(null);
     setCalendarConnection(null);
     setGoogleSession(null);
-    sessionStorage.removeItem('campusreply_user');
-    sessionStorage.removeItem('campusreply_mailbox');
-    sessionStorage.removeItem('campusreply_calendar');
+    sessionStorage.removeItem('relayr_user');
+    sessionStorage.removeItem('relayr_mailbox');
+    sessionStorage.removeItem('relayr_calendar');
     clearSession();
   };
 
