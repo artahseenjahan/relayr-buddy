@@ -31,7 +31,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
             <GraduationCap className="w-4.5 h-4.5 text-primary-foreground" style={{ width: 18, height: 18 }} />
           </div>
-          {!collapsed && <span className="font-bold text-sm" style={{ color: 'hsl(var(--sidebar-fg))' }}>CampusReply</span>}
+          {!collapsed && <span className="font-bold text-sm" style={{ color: 'hsl(var(--sidebar-fg))' }}>Relayr</span>}
         </div>
 
         {/* Navigation */}

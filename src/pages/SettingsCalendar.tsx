@@ -156,7 +156,7 @@ export default function SettingsCalendar() {
               ) : (
                 <>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Connect your Google Calendar to let CampusReply detect your free slots and suggest meeting times directly inside email drafts. Only busy/free status is read — no event titles or details are accessed.
+                    Connect your Google Calendar to let Relayr detect your free slots and suggest meeting times directly inside email drafts. Only busy/free status is read — no event titles or details are accessed.
                   </p>
                   {connectError && (
                     <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/5 border border-destructive/20 rounded-lg p-3">
