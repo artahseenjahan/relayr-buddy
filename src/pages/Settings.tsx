@@ -108,7 +108,7 @@ export default function Settings() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Revoke Google Access?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will revoke CampusReply's access to your Gmail and clear the stored token. Draft personalisation and persona calibration from Gmail will no longer be available until you reconnect.
+                        This will revoke Relayr's access to your Gmail and clear the stored token. Draft personalisation and persona calibration from Gmail will no longer be available until you reconnect.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -133,7 +133,7 @@ export default function Settings() {
 
               <div className="p-3 rounded-lg bg-muted text-xs text-muted-foreground flex items-start gap-2">
                 <ShieldCheck className="w-4 h-4 shrink-0 text-primary mt-0.5" />
-                <span>Token stored in-session only (expires 1 hour). No email content or full bodies are ever stored. Gmail access is read-only — CampusReply cannot send emails on your behalf.</span>
+                <span>Token stored in-session only (expires 1 hour). No email content or full bodies are ever stored. Gmail access is read-only — Relayr cannot send emails on your behalf.</span>
               </div>
             </CardContent>
           </Card>
@@ -312,7 +312,7 @@ export default function Settings() {
               />
             </div>
             <p className="text-xs text-muted-foreground mt-4 p-3 bg-muted rounded-md">
-              🔒 CampusReply never auto-sends emails. All drafts require human approval before sending.
+              🔒 Relayr never auto-sends emails. All drafts require human approval before sending.
             </p>
           </CardContent>
         </Card>
