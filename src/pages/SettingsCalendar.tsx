@@ -156,7 +156,7 @@ export default function SettingsCalendar() {
               ) : (
                 <>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Connect your Google Calendar to let CampusReply detect your free slots and suggest meeting times directly inside email drafts. Only busy/free status is read — no event titles or details are accessed.
+                    Connect your Google Calendar to let Relayr detect your free slots and suggest meeting times directly inside email drafts. Only busy/free status is read — no event titles or details are accessed.
                   </p>
                   {connectError && (
                     <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/5 border border-destructive/20 rounded-lg p-3">
@@ -258,7 +258,7 @@ export default function SettingsCalendar() {
               <Info className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
               <div className="space-y-1">
                 <div className="font-medium text-foreground">Using availability in ticket replies</div>
-                <p>When composing a reply in any ticket, click the <strong className="text-foreground">Insert Available Slots</strong> button in the Draft tab. CampusReply will fetch your next free slots and append a formatted availability block to the email draft.</p>
+                <p>When composing a reply in any ticket, click the <strong className="text-foreground">Insert Available Slots</strong> button in the Draft tab. Relayr will fetch your next free slots and append a formatted availability block to the email draft.</p>
                 <button
                   onClick={() => navigate('/inbox')}
                   className="mt-1 text-primary hover:underline font-medium"

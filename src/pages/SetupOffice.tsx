@@ -27,7 +27,7 @@ export default function SetupOffice() {
             <Users className="w-5 h-5 text-primary" />
             Office Details
           </CardTitle>
-          <CardDescription>Define the office that will use CampusReply</CardDescription>
+          <CardDescription>Define the office that will use Relayr</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

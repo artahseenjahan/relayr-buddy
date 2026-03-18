@@ -50,15 +50,15 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const stored = sessionStorage.getItem('campusreply_user');
+    const stored = sessionStorage.getItem('relayr_user');
     return stored ? JSON.parse(stored) : null;
   });
   const [mailboxConnection, setMailboxConnection] = useState<MailboxConnection | null>(() => {
-    const stored = sessionStorage.getItem('campusreply_mailbox');
+    const stored = sessionStorage.getItem('relayr_mailbox');
     return stored ? JSON.parse(stored) : null;
   });
   const [calendarConnection, setCalendarConnection] = useState<CalendarConnection | null>(() => {
-    const stored = sessionStorage.getItem('campusreply_calendar');
+    const stored = sessionStorage.getItem('relayr_calendar');
     return stored ? JSON.parse(stored) : null;
   });
   const [ticketList, setTicketList] = useState<Ticket[]>(seedTickets);
@@ -75,7 +75,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const user = users.find(u => u.email === email);
     if (user && password === 'password123') {
       setCurrentUser(user);
-      sessionStorage.setItem('campusreply_user', JSON.stringify(user));
+      sessionStorage.setItem('relayr_user', JSON.stringify(user));
       return true;
     }
     return false;
@@ -86,9 +86,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMailboxConnection(null);
     setCalendarConnection(null);
     setGoogleSession(null);
-    sessionStorage.removeItem('campusreply_user');
-    sessionStorage.removeItem('campusreply_mailbox');
-    sessionStorage.removeItem('campusreply_calendar');
+    sessionStorage.removeItem('relayr_user');
+    sessionStorage.removeItem('relayr_mailbox');
+    sessionStorage.removeItem('relayr_calendar');
     clearSession();
   };
 
@@ -101,14 +101,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       lastSyncAt: new Date().toISOString(),
     };
     setMailboxConnection(conn);
-    sessionStorage.setItem('campusreply_mailbox', JSON.stringify(conn));
+    sessionStorage.setItem('relayr_mailbox', JSON.stringify(conn));
   };
 
   const disconnectMailbox = () => {
     if (mailboxConnection) {
       const updated = { ...mailboxConnection, status: 'disconnected' as const };
       setMailboxConnection(updated);
-      sessionStorage.setItem('campusreply_mailbox', JSON.stringify(updated));
+      sessionStorage.setItem('relayr_mailbox', JSON.stringify(updated));
     }
   };
 
@@ -128,12 +128,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userEmail: session.userEmail,
     };
     setCalendarConnection(conn);
-    sessionStorage.setItem('campusreply_calendar', JSON.stringify(conn));
+    sessionStorage.setItem('relayr_calendar', JSON.stringify(conn));
   };
 
   const disconnectCalendar = () => {
     setCalendarConnection(null);
-    sessionStorage.removeItem('campusreply_calendar');
+    sessionStorage.removeItem('relayr_calendar');
   };
 
   const connectGoogle = async (): Promise<GoogleOAuthSession> => {

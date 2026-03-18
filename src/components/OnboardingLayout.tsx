@@ -15,7 +15,7 @@ export default function OnboardingLayout({ step, totalSteps, title, children }: 
         <div className="text-center mb-6">
           <div className="inline-flex items-center gap-2 mb-3">
             <GraduationCap className="w-6 h-6 text-primary" />
-            <span className="font-bold text-foreground">CampusReply</span>
+            <span className="font-bold text-foreground">Relayr</span>
           </div>
           <div className="flex items-center justify-center gap-2 mb-4">
             {Array.from({ length: totalSteps }).map((_, i) => (

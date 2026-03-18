@@ -71,7 +71,7 @@ export default function ConnectEmail() {
               Select Email Provider
             </CardTitle>
             <CardDescription>
-              CampusReply reads your sent mail to personalise AI drafts. No emails are sent without your approval.
+              Relayr reads your sent mail to personalise AI drafts. No emails are sent without your approval.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
