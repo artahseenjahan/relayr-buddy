@@ -312,7 +312,7 @@ export default function Settings() {
               />
             </div>
             <p className="text-xs text-muted-foreground mt-4 p-3 bg-muted rounded-md">
-              🔒 CampusReply never auto-sends emails. All drafts require human approval before sending.
+              🔒 Relayr never auto-sends emails. All drafts require human approval before sending.
             </p>
           </CardContent>
         </Card>
