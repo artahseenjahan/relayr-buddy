@@ -178,7 +178,7 @@ export default function SetupPersona() {
                           <Building2 className="w-3.5 h-3.5 text-primary" />
                           Which office are you calibrating for?
                         </p>
-                        <p>CampusReply serves all administrative offices — select yours so the tone analysis reflects your specific communication context.</p>
+                        <p>Relayr serves all administrative offices — select yours so the tone analysis reflects your specific communication context.</p>
                       </div>
                       <div className="space-y-1.5">
                         <Label className="text-xs">Your Office</Label>

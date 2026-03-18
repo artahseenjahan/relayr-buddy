@@ -258,7 +258,7 @@ export default function SettingsCalendar() {
               <Info className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
               <div className="space-y-1">
                 <div className="font-medium text-foreground">Using availability in ticket replies</div>
-                <p>When composing a reply in any ticket, click the <strong className="text-foreground">Insert Available Slots</strong> button in the Draft tab. CampusReply will fetch your next free slots and append a formatted availability block to the email draft.</p>
+                <p>When composing a reply in any ticket, click the <strong className="text-foreground">Insert Available Slots</strong> button in the Draft tab. Relayr will fetch your next free slots and append a formatted availability block to the email draft.</p>
                 <button
                   onClick={() => navigate('/inbox')}
                   className="mt-1 text-primary hover:underline font-medium"
