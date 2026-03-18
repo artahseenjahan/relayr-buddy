@@ -101,7 +101,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       lastSyncAt: new Date().toISOString(),
     };
     setMailboxConnection(conn);
-    sessionStorage.setItem('campusreply_mailbox', JSON.stringify(conn));
+    sessionStorage.setItem('relayr_mailbox', JSON.stringify(conn));
   };
 
   const disconnectMailbox = () => {
