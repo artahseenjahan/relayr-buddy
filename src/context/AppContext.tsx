@@ -75,7 +75,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const user = users.find(u => u.email === email);
     if (user && password === 'password123') {
       setCurrentUser(user);
-      sessionStorage.setItem('campusreply_user', JSON.stringify(user));
+      sessionStorage.setItem('relayr_user', JSON.stringify(user));
       return true;
     }
     return false;
