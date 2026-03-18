@@ -128,7 +128,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userEmail: session.userEmail,
     };
     setCalendarConnection(conn);
-    sessionStorage.setItem('campusreply_calendar', JSON.stringify(conn));
+    sessionStorage.setItem('relayr_calendar', JSON.stringify(conn));
   };
 
   const disconnectCalendar = () => {
