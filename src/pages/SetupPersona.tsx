@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,6 +46,7 @@ const ListField = ({ label, items, onChange, placeholder }: { label: string; ite
 export default function SetupPersona() {
   const navigate = useNavigate();
   const { googleSession } = useApp();
+  const { user } = useAuth();
   const [roleTitle, setRoleTitle] = useState('');
   const [authorityLevel, setAuthorityLevel] = useState('2');
   const [toneDefault, setToneDefault] = useState<ToneDefault>('warm-professional');
@@ -52,6 +56,7 @@ export default function SetupPersona() {
   const [cannotDo, setCannotDo] = useState<string[]>([]);
   const [approvedPhrases, setApprovedPhrases] = useState<string[]>([]);
   const [safeLanguageTemplates, setSafeLanguageTemplates] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
 
   // Gmail calibration state
   const [gmailStep, setGmailStep] = useState<'office_select' | 'idle' | 'loading' | 'selecting' | 'extracting' | 'preview'>('office_select');
@@ -68,8 +73,40 @@ export default function SetupPersona() {
   const gmailRoleLabel = allPersonas.find(p => p.id === gmailPersonaId)?.roleTitle || gmailCustomRole || '—';
   const canProceed = gmailOfficeId !== '' && (gmailPersonaId !== '' || gmailCustomRole.trim() !== '');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Save to database if user is authenticated
+    if (user) {
+      setSaving(true);
+      try {
+        const { error } = await supabase.from('personas').upsert({
+          user_id: user.id,
+          role_title: roleTitle,
+          authority_level: parseInt(authorityLevel),
+          tone_default: toneDefault,
+          signature_block: signatureBlock,
+          communication_structure: communicationStructure,
+          can_do: canDo,
+          cannot_do: cannotDo,
+          approved_phrases: approvedPhrases,
+          safe_language_templates: safeLanguageTemplates,
+          office_id: gmailOfficeId || null,
+          formality_score: extractedProfile?.formalityScore ?? null,
+          warmth_score: extractedProfile?.warmthScore ?? null,
+          conciseness_score: extractedProfile?.conciseScore ?? null,
+        }, { onConflict: 'user_id' });
+        
+        if (error) throw error;
+        toast.success('Persona saved successfully!');
+      } catch (err: any) {
+        toast.error('Failed to save persona: ' + (err.message || 'Unknown error'));
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+    }
+    
     navigate('/inbox');
   };
 

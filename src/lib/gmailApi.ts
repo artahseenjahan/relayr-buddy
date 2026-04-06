@@ -1,84 +1,54 @@
 /**
- * Gmail REST API — thin wrapper using fetch.
- * PRIVACY CONTRACT:
- *  - Only snippet + metadata (subject, from, date) are fetched. Full body is never requested.
- *  - No email content is persisted anywhere — results are held in component state only.
- *  - Read-only scope (gmail.readonly).
+ * Gmail API client — calls server-side Edge Function instead of Gmail directly.
+ * All Gmail operations are proxied through the backend for token security.
  */
 
-const BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
+import { supabase } from "@/integrations/supabase/client";
 
 export interface GmailMessageMeta {
   id: string;
   subject: string;
-  snippet: string;       // ~100-char preview extracted by Gmail — not the full body
+  snippet: string;
   date: string;
   to?: string;
 }
 
-/** Fetch list of sent message IDs (no content yet). */
-async function listSentMessageIds(token: string, maxResults = 50, query = ''): Promise<string[]> {
-  const q = encodeURIComponent(`in:sent ${query}`.trim());
-  const res = await fetch(`${BASE}/messages?labelIds=SENT&maxResults=${maxResults}&q=${q}`, {
-    headers: { Authorization: `Bearer ${token}` },
+async function callGmailProxy(action: string, googleAccessToken: string, params: Record<string, any> = {}) {
+  const { data, error } = await supabase.functions.invoke("gmail-proxy", {
+    body: { action, googleAccessToken, ...params },
   });
-  if (!res.ok) throw new Error(`Gmail list error: ${res.status}`);
-  const data = await res.json();
-  return (data.messages || []).map((m: { id: string }) => m.id);
+  if (error) throw new Error(error.message || "Gmail proxy error");
+  return data;
 }
 
-/** Fetch snippet + metadata for a single message. Full body is intentionally excluded. */
-async function fetchMessageMeta(token: string, messageId: string): Promise<GmailMessageMeta> {
-  const res = await fetch(
-    `${BASE}/messages/${messageId}?format=metadata&metadataHeaders=Subject&metadataHeaders=To&metadataHeaders=Date`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  if (!res.ok) throw new Error(`Gmail message fetch error: ${res.status}`);
-  const data = await res.json();
-
-  const headers: { name: string; value: string }[] = data.payload?.headers || [];
-  const getHeader = (name: string) => headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';
-
-  return {
-    id: messageId,
-    subject: getHeader('Subject') || '(no subject)',
-    snippet: data.snippet || '',
-    date: getHeader('Date') || '',
-    to: getHeader('To'),
-  };
+/** Fetch recent sent emails via server-side proxy */
+export async function fetchSentEmails(googleAccessToken: string, maxResults = 50): Promise<GmailMessageMeta[]> {
+  return callGmailProxy("fetch_sent", googleAccessToken, { maxResults });
 }
 
-/**
- * Fetch recent sent emails — subject + snippet only.
- * Returns at most `maxResults` items after fetching individual snippets.
- */
-export async function fetchSentEmails(token: string, maxResults = 50): Promise<GmailMessageMeta[]> {
-  const ids = await listSentMessageIds(token, maxResults);
-  // Fetch up to 30 in parallel (limit concurrency to avoid rate limits)
-  const batchSize = 5;
-  const results: GmailMessageMeta[] = [];
-  for (let i = 0; i < Math.min(ids.length, 30); i += batchSize) {
-    const batch = ids.slice(i, i + batchSize);
-    const fetched = await Promise.all(batch.map(id => fetchMessageMeta(token, id).catch(() => null)));
-    results.push(...(fetched.filter(Boolean) as GmailMessageMeta[]));
-  }
-  return results;
+/** Search sent mail by keywords via server-side proxy */
+export async function searchGmailSent(googleAccessToken: string, keywords: string[]): Promise<GmailMessageMeta[]> {
+  return callGmailProxy("search_sent", googleAccessToken, { keywords });
 }
 
-/**
- * Search the user's sent mail for messages matching keywords from the current ticket.
- * Returns snippets to use as personalization context in draft generation.
- */
-export async function searchGmailSent(token: string, keywords: string[]): Promise<GmailMessageMeta[]> {
-  const query = keywords.slice(0, 5).join(' OR ');
-  const ids = await listSentMessageIds(token, 8, query);
-  const results = await Promise.all(ids.slice(0, 5).map(id => fetchMessageMeta(token, id).catch(() => null)));
-  return results.filter(Boolean) as GmailMessageMeta[];
+/** Send a reply via server-side proxy */
+export async function sendGmailReply(
+  googleAccessToken: string,
+  to: string,
+  subject: string,
+  body: string,
+  threadId?: string
+): Promise<any> {
+  return callGmailProxy("send_reply", googleAccessToken, { to, subject, body, threadId });
+}
+
+/** Fetch inbox messages via server-side proxy */
+export async function fetchInboxEmails(googleAccessToken: string, maxResults = 20): Promise<GmailMessageMeta[]> {
+  return callGmailProxy("fetch_inbox", googleAccessToken, { maxResults });
 }
 
 /**
  * Extract the most meaningful keywords from a ticket subject + latest message snippet.
- * Used to drive the Gmail sent-mail search.
  */
 export function extractTicketKeywords(subject: string, body?: string): string[] {
   const STOP_WORDS = new Set([
