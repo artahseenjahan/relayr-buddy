@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppProvider, useApp } from "./context/AppContext";
+import { AuthProvider, useAuth } from "./hooks/useAuth";
 import Login from "./pages/Login";
 import ConnectEmail from "./pages/ConnectEmail";
 import SetupSchool from "./pages/SetupSchool";
@@ -23,17 +24,27 @@ const queryClient = new QueryClient();
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useApp();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const { user, loading } = useAuth();
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading…</div>;
+
+  // Allow access if either Supabase auth or demo mode is active
+  if (!isAuthenticated && !user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 };
 
 const AppRoutes = () => {
-  const { isAuthenticated, mailboxConnection } = useApp();
+  const { isAuthenticated } = useApp();
+  const { user, loading } = useAuth();
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading…</div>;
+
+  const loggedIn = isAuthenticated || !!user;
 
   return (
     <Routes>
       <Route path="/login" element={
-        isAuthenticated
+        loggedIn
           ? <Navigate to="/inbox" replace />
           : <Login />
       } />
@@ -61,9 +72,11 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AppProvider>
-          <AppRoutes />
-        </AppProvider>
+        <AuthProvider>
+          <AppProvider>
+            <AppRoutes />
+          </AppProvider>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
