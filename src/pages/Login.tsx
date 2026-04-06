@@ -1,21 +1,37 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '../context/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { GraduationCap, AlertCircle } from 'lucide-react';
+import { GraduationCap, AlertCircle, Chrome } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, mailboxConnection } = useApp();
+  const { signInWithGoogle, user } = useAuth();
+  const { login } = useApp();
   const [email, setEmail] = useState('alex@westbrook.edu');
   const [password, setPassword] = useState('password123');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [showDemo, setShowDemo] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setGoogleLoading(true);
+    try {
+      await signInWithGoogle();
+      // Auth state change will redirect via ProtectedRoute
+    } catch (err: any) {
+      setError(err.message || 'Google sign-in failed');
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleDemoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -43,50 +59,79 @@ export default function Login() {
         <Card className="shadow-lg border-border">
           <CardHeader>
             <CardTitle>Sign in to your account</CardTitle>
-            <CardDescription>Enter your university email and password</CardDescription>
+            <CardDescription>Use your Google account or try demo mode</CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="you@university.edu"
-                  required
-                />
+          <CardContent className="space-y-4">
+            <Button
+              onClick={handleGoogleSignIn}
+              disabled={googleLoading}
+              className="w-full"
+              variant="default"
+            >
+              <Chrome className="w-4 h-4 mr-2" />
+              {googleLoading ? 'Connecting…' : 'Sign in with Google'}
+            </Button>
+
+            {error && (
+              <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                {error}
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                />
+            )}
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
               </div>
-
-              {error && (
-                <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
-                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                  {error}
-                </div>
-              )}
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Signing in…' : 'Sign in'}
-              </Button>
-            </form>
-
-            <div className="mt-4 p-3 rounded-md bg-muted text-muted-foreground text-xs">
-              <strong>Demo credentials:</strong><br />
-              Email: alex@westbrook.edu<br />
-              Password: password123
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">or</span>
+              </div>
             </div>
+
+            {!showDemo ? (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setShowDemo(true)}
+              >
+                Try Demo Mode
+              </Button>
+            ) : (
+              <form onSubmit={handleDemoSubmit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="email">Email address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="you@university.edu"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+
+                <Button type="submit" className="w-full" variant="secondary" disabled={loading}>
+                  {loading ? 'Signing in…' : 'Enter Demo Mode'}
+                </Button>
+
+                <div className="p-3 rounded-md bg-muted text-muted-foreground text-xs">
+                  <strong>Demo credentials:</strong><br />
+                  Email: alex@westbrook.edu<br />
+                  Password: password123
+                </div>
+              </form>
+            )}
           </CardContent>
         </Card>
       </div>
