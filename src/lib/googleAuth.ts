@@ -100,8 +100,8 @@ async function fetchGoogleProfile(accessToken: string): Promise<{ email: string;
 
 /** Initiate Google OAuth implicit flow (popup). Resolves with a GoogleOAuthSession. */
 export async function signInWithGoogle(): Promise<GoogleOAuthSession> {
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  if (!clientId) throw new Error('VITE_GOOGLE_CLIENT_ID is not set');
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || (await import('./googleConfig')).GOOGLE_CLIENT_ID;
+  if (!clientId) throw new Error('Google Client ID is not configured');
 
   await loadGIS();
 

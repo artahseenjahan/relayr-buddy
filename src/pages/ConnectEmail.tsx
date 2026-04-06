@@ -15,7 +15,8 @@ export default function ConnectEmail() {
   const handleGmail = async () => {
     setConnecting('gmail');
     setError(null);
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const { GOOGLE_CLIENT_ID } = await import('../lib/googleConfig');
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID;
     if (!clientId || clientId === 'your-client-id-here') {
       // Graceful degradation — mock flow if no client ID is configured
       await new Promise(r => setTimeout(r, 1200));
