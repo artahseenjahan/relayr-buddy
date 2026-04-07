@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -14,7 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { UserCircle, Plus, X, CheckCircle2, Sparkles, Mail, ShieldCheck, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Building2 } from 'lucide-react';
 import OnboardingLayout from '../components/OnboardingLayout';
 import { ToneDefault } from '../types';
-import { fetchSentEmails, GmailMessageMeta } from '../lib/gmailApi';
+import { fetchSentEmails, checkGmailConnection, GmailMessageMeta } from '../lib/gmailApi';
 import { extractPersonaFromEmails, ExtractedPersonaProfile } from '../lib/personaExtractor';
 import { offices, personas as allPersonas } from '../data/mockDb';
 
@@ -45,8 +45,18 @@ const ListField = ({ label, items, onChange, placeholder }: { label: string; ite
 
 export default function SetupPersona() {
   const navigate = useNavigate();
-  const { googleSession } = useApp();
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailEmail, setGmailEmail] = useState<string | null>(null);
   const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      checkGmailConnection().then(res => {
+        setGmailConnected(res.connected);
+        setGmailEmail(res.email || null);
+      }).catch(() => {});
+    }
+  }, [user]);
   const [roleTitle, setRoleTitle] = useState('');
   const [authorityLevel, setAuthorityLevel] = useState('2');
   const [toneDefault, setToneDefault] = useState<ToneDefault>('warm-professional');
@@ -111,11 +121,11 @@ export default function SetupPersona() {
   };
 
   const loadGmailEmails = async () => {
-    if (!googleSession) return;
+    if (!gmailConnected) return;
     setGmailStep('loading');
     setGmailError(null);
     try {
-      const emails = await fetchSentEmails(googleSession.accessToken, 50);
+      const emails = await fetchSentEmails(50);
       setGmailEmails(emails);
       setGmailStep('selecting');
       // Auto-select first 10
@@ -198,7 +208,7 @@ export default function SetupPersona() {
                   <div className="text-sm font-semibold text-foreground">Calibrate Persona from Gmail</div>
                   <div className="text-xs text-muted-foreground">Select your office &amp; role, then auto-extract tone from up to 30 sent emails (snippets only)</div>
                 </div>
-                {googleSession && (
+                {gmailConnected && (
                   <span className="text-[10px] bg-primary/15 text-primary px-2 py-0.5 rounded-full font-medium">Connected</span>
                 )}
                 {gmailExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
@@ -278,19 +288,19 @@ export default function SetupPersona() {
                     </div>
                   )}
 
-                  {gmailStep !== 'office_select' && !googleSession && (
+                  {gmailStep !== 'office_select' && !gmailConnected && (
                     <div className="flex items-start gap-2 text-xs text-muted-foreground">
                       <AlertCircle className="w-4 h-4 shrink-0 text-muted-foreground mt-0.5" />
                       <span>Connect your Gmail account in <a href="/settings" className="text-primary hover:underline">Settings → Google Account</a> to enable calibration.</span>
                     </div>
                   )}
 
-                  {gmailStep !== 'office_select' && googleSession && (
+                  {gmailStep !== 'office_select' && gmailConnected && (
                     <>
                       <div className="flex items-center gap-2 text-xs">
                         <Mail className="w-3.5 h-3.5 text-primary" />
                         <span className="text-muted-foreground">Connected as</span>
-                        <span className="font-medium text-foreground">{googleSession.userEmail}</span>
+                        <span className="font-medium text-foreground">{gmailEmail || "your Gmail"}</span>
                       </div>
 
                       {gmailError && (

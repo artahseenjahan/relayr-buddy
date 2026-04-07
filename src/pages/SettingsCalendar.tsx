@@ -31,7 +31,7 @@ function dayLabel(dateStr: string): string {
 
 export default function SettingsCalendar() {
   const navigate = useNavigate();
-  const { calendarConnection, connectCalendar, disconnectCalendar, googleSession } = useApp();
+  const { calendarConnection, connectCalendar, disconnectCalendar } = useApp();
 
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -62,11 +62,11 @@ export default function SettingsCalendar() {
   };
 
   const handleLoadAvailability = async () => {
-    if (!calendarConnection || !googleSession) return;
+    if (!calendarConnection) return;
     setLoadingSlots(true);
     setSlotError(null);
     try {
-      const result = await getFreeBusySlots(googleSession.accessToken);
+      const result = await getFreeBusySlots("");
       setSlots(result);
       setSlotsFetched(true);
     } catch (err: any) {

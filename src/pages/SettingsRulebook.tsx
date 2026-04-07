@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppLayout from '../components/AppLayout';
 import RulebookUpload from '../components/RulebookUpload';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import {
   BookOpen, Shield, User, ChevronDown, ChevronUp, Trash2,
@@ -19,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { type ParsedRulebookLayers } from '@/lib/rulebookParser';
-import { fetchSentEmails, GmailMessageMeta } from '@/lib/gmailApi';
+import { fetchSentEmails, checkGmailConnection, GmailMessageMeta } from '../lib/gmailApi';
 import { extractPersonaFromEmails, ExtractedPersonaProfile } from '@/lib/personaExtractor';
 import { offices, personas } from '@/data/mockDb';
 
@@ -154,7 +155,14 @@ const ScoreBar = ({ value, label }: { value: number; label: string }) => (
 type GmailStep = 'role_select' | 'idle' | 'loading' | 'selecting' | 'extracting' | 'preview';
 
 function GmailToneDemoPanel() {
-  const { googleSession, connectGoogle } = useApp();
+  const { user } = useAuth();
+  const [gmailConnected, setGmailConnected] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      checkGmailConnection().then(res => setGmailConnected(res.connected)).catch(() => {});
+    }
+  }, [user]);
 
   const [expanded, setExpanded] = useState(false);
   const [step, setStep] = useState<GmailStep>('role_select');
@@ -174,24 +182,16 @@ function GmailToneDemoPanel() {
   const selectedOffice = offices.find(o => o.id === selectedOfficeId);
   const selectedPersona = personas.find(p => p.id === selectedPersonaId);
 
-  const handleConnect = async () => {
-    setConnecting(true);
-    setError(null);
-    try {
-      await connectGoogle();
-    } catch (err: any) {
-      setError(err?.message || 'Could not connect Google account.');
-    } finally {
-      setConnecting(false);
-    }
+  const handleConnect = () => {
+    window.location.href = '/connect-email';
   };
 
   const loadEmails = async () => {
-    if (!googleSession) return;
+    if (!gmailConnected) return;
     setStep('loading');
     setError(null);
     try {
-      const fetched = await fetchSentEmails(googleSession.accessToken, MAX);
+      const fetched = await fetchSentEmails(MAX);
       setEmails(fetched);
       setSelected(new Set(fetched.slice(0, 10).map(e => e.id)));
       setStep('selecting');
@@ -261,7 +261,7 @@ function GmailToneDemoPanel() {
             {selectedOffice.name}
           </span>
         )}
-        {googleSession && (
+        {gmailConnected && (
           <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium shrink-0">
             Gmail connected
           </span>
@@ -382,7 +382,7 @@ function GmailToneDemoPanel() {
             )}
 
             {/* ── Not connected (shown after role selected) ── */}
-            {step === 'idle' && !googleSession && (
+            {step === 'idle' && !gmailConnected && (
               <div className="space-y-3">
                 <div className="p-3 rounded-lg bg-muted text-xs text-muted-foreground space-y-1">
                   <p className="font-medium text-foreground">How it works</p>
@@ -406,16 +406,15 @@ function GmailToneDemoPanel() {
             )}
 
             {/* ── Connected, idle ── */}
-            {step === 'idle' && googleSession && (
+            {step === 'idle' && gmailConnected && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted">
-                  {googleSession.userPicture
-                    ? <img src={googleSession.userPicture} alt="" className="w-7 h-7 rounded-full border border-border" />
-                    : <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">{googleSession.userName?.[0] || 'G'}</div>
+                  
+                    <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">G</div>
                   }
                   <div className="min-w-0">
-                    <div className="text-xs font-medium text-foreground">{googleSession.userName}</div>
-                    <div className="text-[10px] text-muted-foreground">{googleSession.userEmail}</div>
+                    <div className="text-xs font-medium text-foreground">{'Gmail User'}</div>
+                    <div className="text-[10px] text-muted-foreground">{'connected'}</div>
                   </div>
                   <CheckCircle2 className="w-4 h-4 text-[hsl(var(--status-approved))] ml-auto shrink-0" />
                 </div>

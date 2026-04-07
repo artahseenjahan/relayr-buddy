@@ -1,50 +1,67 @@
 /**
- * Gmail API client — calls server-side Edge Function instead of Gmail directly.
- * All Gmail operations are proxied through the backend for token security.
+ * Gmail API client — all operations go through the server-side Edge Function.
+ * No client-side Google tokens needed — the edge function reads tokens from the database.
  */
 
 import { supabase } from "@/integrations/supabase/client";
 
 export interface GmailMessageMeta {
   id: string;
+  threadId?: string;
   subject: string;
   snippet: string;
   date: string;
+  from?: string;
   to?: string;
 }
 
-async function callGmailProxy(action: string, googleAccessToken: string, params: Record<string, any> = {}) {
+async function callGmailProxy(action: string, params: Record<string, any> = {}) {
   const { data, error } = await supabase.functions.invoke("gmail-proxy", {
-    body: { action, googleAccessToken, ...params },
+    body: { action, ...params },
   });
   if (error) throw new Error(error.message || "Gmail proxy error");
+  if (data?.error) throw new Error(data.error);
   return data;
 }
 
+/** Exchange OAuth code and store tokens server-side */
+export async function exchangeAndStoreTokens(code: string, redirectUri: string) {
+  return callGmailProxy("exchange_and_store", { code, redirectUri });
+}
+
+/** Check if current user has Gmail connected */
+export async function checkGmailConnection(): Promise<{ connected: boolean; email?: string }> {
+  return callGmailProxy("check_connection");
+}
+
+/** Disconnect Gmail */
+export async function disconnectGmail() {
+  return callGmailProxy("disconnect");
+}
+
 /** Fetch recent sent emails via server-side proxy */
-export async function fetchSentEmails(googleAccessToken: string, maxResults = 50): Promise<GmailMessageMeta[]> {
-  return callGmailProxy("fetch_sent", googleAccessToken, { maxResults });
+export async function fetchSentEmails(maxResults = 50): Promise<GmailMessageMeta[]> {
+  return callGmailProxy("fetch_sent", { maxResults });
 }
 
 /** Search sent mail by keywords via server-side proxy */
-export async function searchGmailSent(googleAccessToken: string, keywords: string[]): Promise<GmailMessageMeta[]> {
-  return callGmailProxy("search_sent", googleAccessToken, { keywords });
+export async function searchGmailSent(keywords: string[]): Promise<GmailMessageMeta[]> {
+  return callGmailProxy("search_sent", { keywords });
 }
 
 /** Send a reply via server-side proxy */
 export async function sendGmailReply(
-  googleAccessToken: string,
   to: string,
   subject: string,
   body: string,
   threadId?: string
 ): Promise<any> {
-  return callGmailProxy("send_reply", googleAccessToken, { to, subject, body, threadId });
+  return callGmailProxy("send_reply", { to, subject, body, threadId });
 }
 
 /** Fetch inbox messages via server-side proxy */
-export async function fetchInboxEmails(googleAccessToken: string, maxResults = 20): Promise<GmailMessageMeta[]> {
-  return callGmailProxy("fetch_inbox", googleAccessToken, { maxResults });
+export async function fetchInboxEmails(maxResults = 20): Promise<GmailMessageMeta[]> {
+  return callGmailProxy("fetch_inbox", { maxResults });
 }
 
 /**
