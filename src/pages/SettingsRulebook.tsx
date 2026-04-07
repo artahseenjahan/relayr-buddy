@@ -154,7 +154,14 @@ const ScoreBar = ({ value, label }: { value: number; label: string }) => (
 type GmailStep = 'role_select' | 'idle' | 'loading' | 'selecting' | 'extracting' | 'preview';
 
 function GmailToneDemoPanel() {
-  const { googleSession, connectGoogle } = useApp();
+  const { user } = useAuth();
+  const [gmailConnected, setGmailConnected] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      checkGmailConnection().then(res => setGmailConnected(res.connected)).catch(() => {});
+    }
+  }, [user]);
 
   const [expanded, setExpanded] = useState(false);
   const [step, setStep] = useState<GmailStep>('role_select');
@@ -174,24 +181,16 @@ function GmailToneDemoPanel() {
   const selectedOffice = offices.find(o => o.id === selectedOfficeId);
   const selectedPersona = personas.find(p => p.id === selectedPersonaId);
 
-  const handleConnect = async () => {
-    setConnecting(true);
-    setError(null);
-    try {
-      await connectGoogle();
-    } catch (err: any) {
-      setError(err?.message || 'Could not connect Google account.');
-    } finally {
-      setConnecting(false);
-    }
+  const handleConnect = () => {
+    window.location.href = '/connect-email';
   };
 
   const loadEmails = async () => {
-    if (!googleSession) return;
+    if (!gmailConnected) return;
     setStep('loading');
     setError(null);
     try {
-      const fetched = await fetchSentEmails(googleSession.accessToken, MAX);
+      const fetched = await fetchSentEmails(MAX);
       setEmails(fetched);
       setSelected(new Set(fetched.slice(0, 10).map(e => e.id)));
       setStep('selecting');

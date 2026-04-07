@@ -15,7 +15,8 @@ import { format, formatDistanceToNowStrict } from 'date-fns';
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { mailboxConnection, disconnectMailbox, clearAllDraftsAndDecisions, drafts, decisions, googleSession, revokeGoogle } = useApp();
+  const { mailboxConnection, disconnectMailbox, clearAllDraftsAndDecisions, drafts, decisions } = useApp();
+  const { user } = useAuth();
   const [dataRetention, setDataRetention] = useState(true);
   const [cleared, setCleared] = useState(false);
   const [revoking, setRevoking] = useState(false);

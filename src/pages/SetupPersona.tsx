@@ -45,7 +45,8 @@ const ListField = ({ label, items, onChange, placeholder }: { label: string; ite
 
 export default function SetupPersona() {
   const navigate = useNavigate();
-  const { googleSession } = useApp();
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailEmail, setGmailEmail] = useState<string | null>(null);
   const { user } = useAuth();
   const [roleTitle, setRoleTitle] = useState('');
   const [authorityLevel, setAuthorityLevel] = useState('2');

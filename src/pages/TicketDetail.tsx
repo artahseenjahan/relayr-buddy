@@ -61,7 +61,8 @@ const STATUS_LABEL: Record<string, string> = {
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { tickets, updateTicket, saveDraft, getDraftForTicket, saveDecision, currentUser, googleSession, calendarConnection } = useApp();
+  const { tickets, updateTicket, saveDraft, getDraftForTicket, saveDecision, currentUser, calendarConnection } = useApp();
+  const { user: authUser } = useAuth();
 
   const ticket = tickets.find(t => t.id === id);
   const existingDraft = getDraftForTicket(id || '');
