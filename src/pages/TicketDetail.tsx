@@ -105,7 +105,7 @@ export default function TicketDetail() {
     let gmailExamples: string[] = [];
 
     // Layer 1: search Gmail history for similar past responses
-    if (gmailAvailable) {
+    if (authUser) {
       setGmailSearching(true);
       try {
         const latestMsg = ticket.threadMessages[ticket.threadMessages.length - 1];
@@ -388,7 +388,7 @@ export default function TicketDetail() {
                       </span>
                     )}
                   </div>
-                  {gmailAvailable && (
+                  {authUser && (
                     <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground px-0.5">
                       <History className="w-3 h-3 text-primary" />
                       Gmail history active — draft will be personalised from your sent mail

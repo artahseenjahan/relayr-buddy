@@ -409,9 +409,8 @@ function GmailToneDemoPanel() {
             {step === 'idle' && gmailConnected && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted">
-                  {null
-                    ? <img src={null} alt="" className="w-7 h-7 rounded-full border border-border" />
-                    : <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">{'G' || 'G'}</div>
+                  
+                    <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">G</div>
                   }
                   <div className="min-w-0">
                     <div className="text-xs font-medium text-foreground">{'Gmail User'}</div>
