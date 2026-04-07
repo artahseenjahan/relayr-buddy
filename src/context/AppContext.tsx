@@ -1,16 +1,9 @@
 import React, { createContext, useContext, useState } from 'react';
-import { User, MailboxConnection, School, Office, Persona, Ticket, Draft, Decision, GoogleOAuthSession, RoutingRule, CalendarConnection } from '../types';
+import { User, MailboxConnection, School, Office, Persona, Ticket, Draft, Decision, RoutingRule, CalendarConnection } from '../types';
 import {
-  users, mailboxConnections as seedMailbox, schools, offices, personas,
+  users, schools, offices, personas,
   tickets as seedTickets, drafts as seedDrafts, decisions as seedDecisions,
-  getTicketById as dbGetTicketById,
 } from '../data/mockDb';
-import {
-  signInWithGoogle,
-  revokeGoogleToken,
-  loadSession,
-  clearSession,
-} from '../lib/googleAuth';
 
 interface AppState {
   currentUser: User | null;
@@ -20,7 +13,6 @@ interface AppState {
   drafts: Draft[];
   decisions: Decision[];
   isAuthenticated: boolean;
-  googleSession: GoogleOAuthSession | null;
   routingRules: RoutingRule[];
 }
 
@@ -39,8 +31,6 @@ interface AppContextType extends AppState {
   getDraftForTicket: (ticketId: string) => Draft | undefined;
   saveDecision: (decision: Decision) => void;
   clearAllDraftsAndDecisions: () => void;
-  connectGoogle: () => Promise<GoogleOAuthSession>;
-  revokeGoogle: () => Promise<void>;
   addRoutingRule: (rule: RoutingRule) => void;
   updateRoutingRule: (rule: RoutingRule) => void;
   deleteRoutingRule: (id: string) => void;
@@ -64,7 +54,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [ticketList, setTicketList] = useState<Ticket[]>(seedTickets);
   const [draftList, setDraftList] = useState<Draft[]>(seedDrafts);
   const [decisionList, setDecisionList] = useState<Decision[]>(seedDecisions);
-  const [googleSession, setGoogleSession] = useState<GoogleOAuthSession | null>(() => loadSession());
   const [routingRules, setRoutingRules] = useState<RoutingRule[]>([
     { id: 'rule-1', keywords: ['FAFSA', 'financial aid', 'tuition', 'scholarship', 'grant'], targetDepartment: 'Financial Aid Office', reason: 'Topics relating to tuition costs, financial assistance, FAFSA, grants, or scholarships belong to Financial Aid.' },
     { id: 'rule-2', keywords: ['transcript', 'enrollment', 'graduation', 'degree audit', 'credits'], targetDepartment: "Registrar's Office", reason: 'Academic records, enrollment verification, transcripts, and degree requirements are handled by the Registrar.' },
@@ -85,11 +74,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentUser(null);
     setMailboxConnection(null);
     setCalendarConnection(null);
-    setGoogleSession(null);
     sessionStorage.removeItem('relayr_user');
     sessionStorage.removeItem('relayr_mailbox');
     sessionStorage.removeItem('relayr_calendar');
-    clearSession();
   };
 
   const connectMailbox = (provider: 'gmail' | 'outlook') => {
@@ -113,19 +100,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const connectCalendar = async (): Promise<void> => {
-    // Reuse existing Google session if valid; otherwise trigger a new sign-in
-    let session = googleSession;
-    if (!session) {
-      session = await signInWithGoogle();
-      setGoogleSession(session);
-    }
     const conn: CalendarConnection = {
       id: `calendar-${Date.now()}`,
       userId: currentUser?.id || 'user-1',
       provider: 'google',
       status: 'connected',
       connectedAt: new Date().toISOString(),
-      userEmail: session.userEmail,
+      userEmail: '',
     };
     setCalendarConnection(conn);
     sessionStorage.setItem('relayr_calendar', JSON.stringify(conn));
@@ -134,20 +115,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const disconnectCalendar = () => {
     setCalendarConnection(null);
     sessionStorage.removeItem('relayr_calendar');
-  };
-
-  const connectGoogle = async (): Promise<GoogleOAuthSession> => {
-    const session = await signInWithGoogle();
-    setGoogleSession(session);
-    connectMailbox('gmail');
-    return session;
-  };
-
-  const revokeGoogle = async (): Promise<void> => {
-    if (googleSession) {
-      await revokeGoogleToken(googleSession.accessToken);
-    }
-    setGoogleSession(null);
   };
 
   const getSchool = (id: string) => schools.find(s => s.id === id);
@@ -194,7 +161,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       drafts: draftList,
       decisions: decisionList,
       isAuthenticated: !!currentUser,
-      googleSession,
       routingRules,
       login,
       logout,
@@ -202,8 +168,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       disconnectMailbox,
       connectCalendar,
       disconnectCalendar,
-      connectGoogle,
-      revokeGoogle,
       getSchool,
       getOffice,
       getPersona,
