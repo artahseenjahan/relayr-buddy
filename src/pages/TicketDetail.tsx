@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../hooks/useAuth';
 import { offices, personas, getRulebookByOfficeId } from '../data/mockDb';
 import { generateDraft, shortenDraft, makeMoreFormal, makeMoreWarm, addBulletList } from '../lib/draftGenerator';
 import { buildIntelligenceReport, IntelligenceReport } from '../lib/intelligenceEngine';
-import { searchGmailSent, extractTicketKeywords } from '../lib/gmailApi';
+import { searchGmailSent, extractTicketKeywords, checkGmailConnection } from '../lib/gmailApi';
 import { getFreeBusySlots, buildAvailabilityText } from '../lib/calendarApi';
 import { Decision } from '../types';
 import AppLayout from '../components/AppLayout';
@@ -104,12 +105,12 @@ export default function TicketDetail() {
     let gmailExamples: string[] = [];
 
     // Layer 1: search Gmail history for similar past responses
-    if (googleSession) {
+    if (gmailAvailable) {
       setGmailSearching(true);
       try {
         const latestMsg = ticket.threadMessages[ticket.threadMessages.length - 1];
         const keywords = extractTicketKeywords(ticket.subject, latestMsg?.body);
-        const matches = await searchGmailSent(googleSession.accessToken, keywords);
+        const matches = await searchGmailSent(keywords);
         gmailExamples = matches.map(m => m.snippet).filter(Boolean);
       } catch {
         // Gmail search failure is non-fatal — fall back to standard generation
@@ -167,8 +168,8 @@ export default function TicketDetail() {
     setInsertingSlots(true);
     setSlotInsertError(null);
     try {
-      if (!googleSession) throw new Error('No Google session active');
-      const slots = await getFreeBusySlots(googleSession.accessToken);
+      
+      const slots = await getFreeBusySlots("");
       if (slots.length === 0) {
         setSlotInsertError('No free slots found in the next 7 business days.');
         return;
@@ -387,7 +388,7 @@ export default function TicketDetail() {
                       </span>
                     )}
                   </div>
-                  {googleSession && (
+                  {gmailAvailable && (
                     <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground px-0.5">
                       <History className="w-3 h-3 text-primary" />
                       Gmail history active — draft will be personalised from your sent mail
