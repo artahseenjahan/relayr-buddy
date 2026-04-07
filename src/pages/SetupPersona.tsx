@@ -48,6 +48,15 @@ export default function SetupPersona() {
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailEmail, setGmailEmail] = useState<string | null>(null);
   const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      checkGmailConnection().then(res => {
+        setGmailConnected(res.connected);
+        setGmailEmail(res.email || null);
+      }).catch(() => {});
+    }
+  }, [user]);
   const [roleTitle, setRoleTitle] = useState('');
   const [authorityLevel, setAuthorityLevel] = useState('2');
   const [toneDefault, setToneDefault] = useState<ToneDefault>('warm-professional');
