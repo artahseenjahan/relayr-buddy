@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../hooks/useAuth';
+import { checkGmailConnection, disconnectGmail } from '../lib/gmailApi';
 import AppLayout from '../components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,17 +12,23 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { Mail, Trash2, ShieldCheck, CheckCircle2, XCircle, Settings as SettingsIcon, BookOpen, ArrowRight, LogOut, Clock, ExternalLink, GitMerge } from 'lucide-react';
-import { format, formatDistanceToNowStrict } from 'date-fns';
+import { Mail, Trash2, ShieldCheck, CheckCircle2, XCircle, Settings as SettingsIcon, BookOpen, ArrowRight, LogOut, ExternalLink, GitMerge } from 'lucide-react';
+import { format } from 'date-fns';
 
 export default function Settings() {
   const navigate = useNavigate();
   const { mailboxConnection, disconnectMailbox, clearAllDraftsAndDecisions, drafts, decisions } = useApp();
-s/const { user } = useAuth();//
   const { user } = useAuth();
   const [dataRetention, setDataRetention] = useState(true);
   const [cleared, setCleared] = useState(false);
   const [revoking, setRevoking] = useState(false);
+  const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; email?: string } | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      checkGmailConnection().then(setGmailStatus).catch(() => setGmailStatus({ connected: false }));
+    }
+  }, [user]);
 
   const handleClear = () => {
     clearAllDraftsAndDecisions();
@@ -31,16 +39,12 @@ s/const { user } = useAuth();//
   const handleRevoke = async () => {
     setRevoking(true);
     try {
-      await revokeGoogle();
+      await disconnectGmail();
+      setGmailStatus({ connected: false });
     } finally {
       setRevoking(false);
     }
   };
-
-  const tokenExpiry = gmailConnected
-    ? new Date(gmailConnected.expiresAt)
-    : null;
-  const tokenValid = tokenExpiry && tokenExpiry > new Date();
 
   return (
     <AppLayout>
@@ -50,7 +54,7 @@ s/const { user } = useAuth();//
         </h2>
 
         {/* Google Account */}
-        {gmailConnected ? (
+        {gmailStatus?.connected ? (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
@@ -66,37 +70,17 @@ s/const { user } = useAuth();//
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
-                {gmailConnected.userPicture ? (
-                  <img src={gmailConnected.userPicture} alt="avatar" className="w-9 h-9 rounded-full border border-border" />
-                ) : (
-                  <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold">
-                    {gmailConnected.userName?.[0] || 'G'}
-                  </div>
-                )}
+                <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold">
+                  G
+                </div>
                 <div>
-                  <div className="font-medium text-sm">{gmailConnected.userName}</div>
-                  <div className="text-xs text-muted-foreground">{gmailConnected.userEmail}</div>
+                  <div className="font-medium text-sm">Gmail Connected</div>
+                  <div className="text-xs text-muted-foreground">{gmailStatus.email}</div>
                 </div>
-                {tokenValid ? (
-                  <span className="ml-auto text-[10px] bg-[hsl(var(--status-approved))]/15 text-[hsl(var(--status-approved))] px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Active
-                  </span>
-                ) : (
-                  <span className="ml-auto text-[10px] bg-destructive/10 text-destructive px-2 py-0.5 rounded-full font-medium">
-                    Expired
-                  </span>
-                )}
+                <span className="ml-auto text-[10px] bg-[hsl(var(--status-approved))]/15 text-[hsl(var(--status-approved))] px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Active
+                </span>
               </div>
-
-              {tokenExpiry && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Clock className="w-3.5 h-3.5" />
-                  {tokenValid
-                    ? `Token expires in ${formatDistanceToNowStrict(tokenExpiry)}`
-                    : `Token expired ${formatDistanceToNowStrict(tokenExpiry)} ago`
-                  } · Read-only · No email content stored
-                </div>
-              )}
 
               <div className="flex gap-2">
                 <AlertDialog>
@@ -122,20 +106,15 @@ s/const { user } = useAuth();//
                   </AlertDialogContent>
                 </AlertDialog>
 
-                <a
-                  href="https://myaccount.google.com/permissions"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-2"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Manage at Google Account
+                <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-2">
+                  <ExternalLink className="w-3.5 h-3.5" /> Manage at Google Account
                 </a>
               </div>
 
               <div className="p-3 rounded-lg bg-muted text-xs text-muted-foreground flex items-start gap-2">
                 <ShieldCheck className="w-4 h-4 shrink-0 text-primary mt-0.5" />
-                <span>Token stored in-session only (expires 1 hour). No email content or full bodies are ever stored. Gmail access is read-only — Relayr cannot send emails on your behalf.</span>
+                <span>Tokens stored server-side with automatic refresh. No email content or full bodies are ever stored permanently.</span>
               </div>
             </CardContent>
           </Card>
@@ -183,10 +162,7 @@ s/const { user } = useAuth();//
                       {mailboxConnection.provider === 'gmail' ? 'Google Gmail' : 'Microsoft Outlook'}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Status: <span className={mailboxConnection.status === 'connected'
-                        ? 'text-[hsl(var(--status-approved))]'
-                        : 'text-[hsl(var(--status-rejected))]'
-                      }>{mailboxConnection.status}</span>
+                      Status: <span className={mailboxConnection.status === 'connected' ? 'text-[hsl(var(--status-approved))]' : 'text-[hsl(var(--status-rejected))]'}>{mailboxConnection.status}</span>
                       {mailboxConnection.status === 'connected' && (
                         <span> · Last synced {format(new Date(mailboxConnection.lastSyncAt), 'MMM d, h:mm a')}</span>
                       )}
@@ -307,11 +283,7 @@ s/const { user } = useAuth();//
                   Keep draft history and decision logs for audit purposes
                 </p>
               </div>
-              <Switch
-                id="retention"
-                checked={dataRetention}
-                onCheckedChange={setDataRetention}
-              />
+              <Switch id="retention" checked={dataRetention} onCheckedChange={setDataRetention} />
             </div>
             <p className="text-xs text-muted-foreground mt-4 p-3 bg-muted rounded-md">
               🔒 Relayr never auto-sends emails. All drafts require human approval before sending.

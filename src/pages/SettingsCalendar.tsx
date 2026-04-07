@@ -62,11 +62,11 @@ export default function SettingsCalendar() {
   };
 
   const handleLoadAvailability = async () => {
-    if (!calendarConnection || !googleSession) return;
+    if (!calendarConnection) return;
     setLoadingSlots(true);
     setSlotError(null);
     try {
-      const result = await getFreeBusySlots(googleSession.accessToken);
+      const result = await getFreeBusySlots("");
       setSlots(result);
       setSlotsFetched(true);
     } catch (err: any) {
