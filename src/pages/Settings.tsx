@@ -16,6 +16,7 @@ import { format, formatDistanceToNowStrict } from 'date-fns';
 export default function Settings() {
   const navigate = useNavigate();
   const { mailboxConnection, disconnectMailbox, clearAllDraftsAndDecisions, drafts, decisions } = useApp();
+s/const { user } = useAuth();//
   const { user } = useAuth();
   const [dataRetention, setDataRetention] = useState(true);
   const [cleared, setCleared] = useState(false);
@@ -36,8 +37,8 @@ export default function Settings() {
     }
   };
 
-  const tokenExpiry = googleSession
-    ? new Date(googleSession.expiresAt)
+  const tokenExpiry = gmailConnected
+    ? new Date(gmailConnected.expiresAt)
     : null;
   const tokenValid = tokenExpiry && tokenExpiry > new Date();
 
@@ -49,7 +50,7 @@ export default function Settings() {
         </h2>
 
         {/* Google Account */}
-        {googleSession ? (
+        {gmailConnected ? (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
@@ -65,16 +66,16 @@ export default function Settings() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
-                {googleSession.userPicture ? (
-                  <img src={googleSession.userPicture} alt="avatar" className="w-9 h-9 rounded-full border border-border" />
+                {gmailConnected.userPicture ? (
+                  <img src={gmailConnected.userPicture} alt="avatar" className="w-9 h-9 rounded-full border border-border" />
                 ) : (
                   <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold">
-                    {googleSession.userName?.[0] || 'G'}
+                    {gmailConnected.userName?.[0] || 'G'}
                   </div>
                 )}
                 <div>
-                  <div className="font-medium text-sm">{googleSession.userName}</div>
-                  <div className="text-xs text-muted-foreground">{googleSession.userEmail}</div>
+                  <div className="font-medium text-sm">{gmailConnected.userName}</div>
+                  <div className="text-xs text-muted-foreground">{gmailConnected.userEmail}</div>
                 </div>
                 {tokenValid ? (
                   <span className="ml-auto text-[10px] bg-[hsl(var(--status-approved))]/15 text-[hsl(var(--status-approved))] px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
