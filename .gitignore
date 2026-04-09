@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python / Backend
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+backend/.env
+.env.local
+backend/relayr_backend.egg-info/
