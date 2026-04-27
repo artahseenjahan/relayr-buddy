@@ -12,11 +12,12 @@ dependencies = [
     "pgvector>=0.3.6",
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
-    "python-jose[cryptography]>=3.3.0",
+    "PyJWT[crypto]>=2.8.0",
     "httpx>=0.28.0",
     "openai>=1.60.0",
     "python-multipart>=0.0.18",
     "gunicorn>=23.0.0",
+    "cryptography>=45.0.0",
 ]
 
 [project.optional-dependencies]

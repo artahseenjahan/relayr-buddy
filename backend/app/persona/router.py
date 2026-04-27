@@ -1,191 +1,97 @@
-"""Persona calibration and writing style profile endpoints (Layer 1)."""
+"""Persona selection and build endpoints."""
 
-import json
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.middleware import verify_supabase_jwt
 from app.database import get_db
-from app.email.gmail_client import fetch_full_message, fetch_messages, get_valid_token
-from app.models.persona import EmailStyleSample, WritingStyleProfile
-from app.persona.llm_client import aggregate_style_profiles, analyze_email_style
+from app.services.persona_service import build_persona, get_latest_persona, list_selectable_messages, save_persona_selection
 
 router = APIRouter()
 
 
-class CalibrateRequest(BaseModel):
-    max_emails: int = 20
+class SourceEmailSelection(BaseModel):
+    gmail_message_id: str
+    gmail_thread_id: str | None = None
+    direction: str = "sent"
+    from_email: str | None = None
+    to_emails: list[str] = Field(default_factory=list)
+    subject: str | None = None
+    snippet: str | None = None
 
 
-class CalibrateResponse(BaseModel):
-    status: str
-    samples_analyzed: int
-    profile: dict[str, object] | None = None
+class SaveSelectionRequest(BaseModel):
+    persona_name: str | None = None
+    selected_messages: list[SourceEmailSelection]
 
 
-class StyleProfileResponse(BaseModel):
-    formality_score: float | None = None
-    warmth_score: float | None = None
-    conciseness_score: float | None = None
-    avg_sentence_length: float | None = None
-    common_greetings: list[str] = []
-    common_closings: list[str] = []
-    style_summary: str | None = None
-    sample_count: int = 0
+class BuildPersonaRequest(BaseModel):
+    persona_profile_id: uuid.UUID | None = None
 
 
-@router.post("/calibrate")
-async def calibrate_persona(
-    req: CalibrateRequest,
-    background_tasks: BackgroundTasks,
+@router.get("/source-emails")
+async def get_persona_source_candidates(
     user_id: uuid.UUID = Depends(verify_supabase_jwt),
     db: AsyncSession = Depends(get_db),
-) -> CalibrateResponse:
-    """Analyze sent emails to build a writing style profile.
-
-    Fetches the user's sent emails from Gmail, runs LLM analysis on each,
-    then aggregates into a unified style profile.
-    """
+) -> dict[str, object]:
     try:
-        token, _ = await get_valid_token(str(user_id), db)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        return await list_selectable_messages(db, user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Fetch sent email metadata
-    sent_messages = await fetch_messages(token, req.max_emails, query="in:sent", label_id="SENT")
 
-    if not sent_messages:
-        return CalibrateResponse(status="no_emails", samples_analyzed=0)
-
-    # Analyze each email's style
-    analyses: list[dict[str, object]] = []
-    samples_saved = 0
-
-    for msg in sent_messages[:req.max_emails]:
-        try:
-            full_msg = await fetch_full_message(token, msg["id"])
-            body = full_msg.get("body", "")
-            if not body or not isinstance(body, str) or len(body) < 50:
-                continue
-
-            analysis = await analyze_email_style(body)
-            if "error" not in analysis:
-                analyses.append(analysis)
-
-                # Save sample metadata (no body stored)
-                sample = EmailStyleSample(
-                    user_id=user_id,
-                    gmail_message_id=msg["id"],
-                    subject=msg.get("subject"),
-                    style_features_json=json.dumps(analysis),
-                )
-                db.add(sample)
-                samples_saved += 1
-        except Exception:
-            continue
-
-    if not analyses:
-        return CalibrateResponse(status="analysis_failed", samples_analyzed=0)
-
-    # Aggregate into unified profile
-    aggregated = await aggregate_style_profiles(analyses)
-
-    # Upsert writing style profile
-    result = await db.execute(
-        select(WritingStyleProfile).where(WritingStyleProfile.user_id == user_id)
-    )
-    existing_profile = result.scalar_one_or_none()
-
-    if existing_profile:
-        existing_profile.formality_score = aggregated.get("formality_score")  # type: ignore[assignment]
-        existing_profile.warmth_score = aggregated.get("warmth_score")  # type: ignore[assignment]
-        existing_profile.conciseness_score = aggregated.get("conciseness_score")  # type: ignore[assignment]
-        existing_profile.avg_sentence_length = aggregated.get("avg_sentence_length")  # type: ignore[assignment]
-        existing_profile.common_greetings = aggregated.get("common_greetings", [])  # type: ignore[assignment]
-        existing_profile.common_closings = aggregated.get("common_closings", [])  # type: ignore[assignment]
-        existing_profile.style_summary = aggregated.get("style_summary")  # type: ignore[assignment]
-        existing_profile.sample_count = samples_saved
-    else:
-        profile = WritingStyleProfile(
+@router.post("/selection")
+async def save_selection(
+    req: SaveSelectionRequest,
+    user_id: uuid.UUID = Depends(verify_supabase_jwt),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, object]:
+    try:
+        return await save_persona_selection(
+            db,
             user_id=user_id,
-            formality_score=aggregated.get("formality_score"),  # type: ignore[arg-type]
-            warmth_score=aggregated.get("warmth_score"),  # type: ignore[arg-type]
-            conciseness_score=aggregated.get("conciseness_score"),  # type: ignore[arg-type]
-            avg_sentence_length=aggregated.get("avg_sentence_length"),  # type: ignore[arg-type]
-            common_greetings=aggregated.get("common_greetings", []),  # type: ignore[arg-type]
-            common_closings=aggregated.get("common_closings", []),  # type: ignore[arg-type]
-            style_summary=aggregated.get("style_summary"),  # type: ignore[arg-type]
-            sample_count=samples_saved,
+            selected_messages=[message.model_dump() for message in req.selected_messages],
+            persona_name=req.persona_name,
         )
-        db.add(profile)
-
-    return CalibrateResponse(
-        status="completed",
-        samples_analyzed=samples_saved,
-        profile=aggregated,
-    )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/profile")
-async def get_style_profile(
+@router.post("/build")
+async def build_selected_persona(
+    req: BuildPersonaRequest,
     user_id: uuid.UUID = Depends(verify_supabase_jwt),
     db: AsyncSession = Depends(get_db),
-) -> StyleProfileResponse:
-    """Get the current writing style profile for the authenticated user."""
-    result = await db.execute(
-        select(WritingStyleProfile).where(WritingStyleProfile.user_id == user_id)
-    )
-    profile = result.scalar_one_or_none()
-
-    if not profile:
-        raise HTTPException(status_code=404, detail="No style profile found. Run calibration first.")
-
-    return StyleProfileResponse(
-        formality_score=profile.formality_score,
-        warmth_score=profile.warmth_score,
-        conciseness_score=profile.conciseness_score,
-        avg_sentence_length=profile.avg_sentence_length,
-        common_greetings=profile.common_greetings,
-        common_closings=profile.common_closings,
-        style_summary=profile.style_summary,
-        sample_count=profile.sample_count,
-    )
+) -> dict[str, object]:
+    try:
+        return await build_persona(db, user_id=user_id, persona_profile_id=req.persona_profile_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.patch("/profile")
-async def update_style_profile(
-    updates: dict[str, object],
+@router.get("/current")
+async def get_current_persona(
     user_id: uuid.UUID = Depends(verify_supabase_jwt),
     db: AsyncSession = Depends(get_db),
-) -> StyleProfileResponse:
-    """Manually adjust the writing style profile."""
-    result = await db.execute(
-        select(WritingStyleProfile).where(WritingStyleProfile.user_id == user_id)
-    )
-    profile = result.scalar_one_or_none()
-
-    if not profile:
-        raise HTTPException(status_code=404, detail="No style profile found. Run calibration first.")
-
-    allowed_fields = {
-        "formality_score", "warmth_score", "conciseness_score",
-        "avg_sentence_length", "common_greetings", "common_closings", "style_summary",
+) -> dict[str, object]:
+    persona = await get_latest_persona(db, user_id=user_id)
+    if not persona:
+        raise HTTPException(status_code=404, detail="No persona found.")
+    return {
+        "id": str(persona.id),
+        "name": persona.name,
+        "tone_summary": persona.tone_summary,
+        "style_summary": persona.style_summary,
+        "greeting_patterns": persona.greeting_patterns,
+        "signoff_patterns": persona.signoff_patterns,
+        "length_preference": persona.length_preference,
+        "formatting_preferences": persona.formatting_preferences,
+        "preferred_phrases": persona.preferred_phrases,
+        "do_not_use_phrases": persona.do_not_use_phrases,
+        "source_email_count": persona.source_email_count,
+        "status": persona.status.value,
+        "last_built_at": persona.last_built_at.isoformat() if persona.last_built_at else None,
     }
-    for key, value in updates.items():
-        if key in allowed_fields:
-            setattr(profile, key, value)
-
-    return StyleProfileResponse(
-        formality_score=profile.formality_score,
-        warmth_score=profile.warmth_score,
-        conciseness_score=profile.conciseness_score,
-        avg_sentence_length=profile.avg_sentence_length,
-        common_greetings=profile.common_greetings,
-        common_closings=profile.common_closings,
-        style_summary=profile.style_summary,
-        sample_count=profile.sample_count,
-    )

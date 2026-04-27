@@ -1,19 +1,21 @@
-"""Email connection and operations endpoints."""
+"""Gmail connection and metadata endpoints for the Relayr MVP."""
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.middleware import verify_supabase_jwt
 from app.database import get_db
-from app.email.gmail_client import (
+from app.services.gmail_service import (
     check_connection,
     disconnect_gmail,
     exchange_oauth_code,
+    fetch_full_message,
     fetch_messages,
-    send_email,
+    fetch_thread,
+    get_valid_token,
 )
 
 router = APIRouter()
@@ -24,11 +26,14 @@ class ConnectRequest(BaseModel):
     redirect_uri: str
 
 
-class SendRequest(BaseModel):
-    to: str
-    subject: str
-    body: str
-    thread_id: str | None = None
+class PersonaMessageSelection(BaseModel):
+    gmail_message_id: str
+    gmail_thread_id: str | None = None
+    direction: str = "sent"
+    from_email: str | None = None
+    to_emails: list[str] = Field(default_factory=list)
+    subject: str | None = None
+    snippet: str | None = None
 
 
 @router.post("/connect")
@@ -37,11 +42,10 @@ async def connect_gmail(
     user_id: uuid.UUID = Depends(verify_supabase_jwt),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
-    """Exchange OAuth code and store Gmail tokens."""
     try:
-        return await exchange_oauth_code(req.code, req.redirect_uri, str(user_id), db)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        return await exchange_oauth_code(req.code, req.redirect_uri, user_id, db)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/status")
@@ -49,8 +53,7 @@ async def gmail_status(
     user_id: uuid.UUID = Depends(verify_supabase_jwt),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
-    """Check Gmail connection status."""
-    return await check_connection(str(user_id), db)
+    return await check_connection(db, user_id)
 
 
 @router.delete("/disconnect")
@@ -58,69 +61,76 @@ async def gmail_disconnect(
     user_id: uuid.UUID = Depends(verify_supabase_jwt),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, bool]:
-    """Disconnect Gmail and revoke tokens."""
-    return await disconnect_gmail(str(user_id), db)
+    return await disconnect_gmail(db, user_id)
 
 
 @router.get("/inbox")
 async def get_inbox(
-    max_results: int = 20,
+    max_results: int = Query(default=20, ge=1, le=50),
     user_id: uuid.UUID = Depends(verify_supabase_jwt),
     db: AsyncSession = Depends(get_db),
-) -> list[dict[str, str]]:
-    """Fetch inbox emails from Gmail."""
-    from app.email.gmail_client import get_valid_token
-
+) -> list[dict[str, object]]:
     try:
-        token, _ = await get_valid_token(str(user_id), db)
-        return await fetch_messages(token, max_results, label_id="INBOX")
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        _, token = await get_valid_token(db, user_id)
+        return await fetch_messages(token, max_results=max_results, label_id="INBOX")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/inbox/{message_id}")
+@router.get("/sent")
+async def get_sent(
+    max_results: int = Query(default=30, ge=1, le=50),
+    keywords: str | None = None,
+    user_id: uuid.UUID = Depends(verify_supabase_jwt),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict[str, object]]:
+    try:
+        _, token = await get_valid_token(db, user_id)
+        query = "in:sent"
+        if keywords:
+            parts = [part.strip() for part in keywords.split(",") if part.strip()][:5]
+            if parts:
+                query = f"in:sent ({' OR '.join(parts)})"
+        return await fetch_messages(token, max_results=max_results, query=query, label_id="SENT")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/messages/selectable")
+async def get_selectable_sent_messages(
+    max_results: int = Query(default=30, ge=1, le=30),
+    user_id: uuid.UUID = Depends(verify_supabase_jwt),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, object]:
+    try:
+        _, token = await get_valid_token(db, user_id)
+        messages = await fetch_messages(token, max_results=max_results, query="in:sent", label_id="SENT")
+        return {"messages": messages, "max_selection": 30}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/messages/{message_id}")
 async def get_message(
     message_id: str,
     user_id: uuid.UUID = Depends(verify_supabase_jwt),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
-    """Get a single email's full details."""
-    from app.email.gmail_client import fetch_full_message, get_valid_token
-
     try:
-        token, _ = await get_valid_token(str(user_id), db)
+        _, token = await get_valid_token(db, user_id)
         return await fetch_full_message(token, message_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/sent")
-async def get_sent(
-    max_results: int = 50,
-    user_id: uuid.UUID = Depends(verify_supabase_jwt),
-    db: AsyncSession = Depends(get_db),
-) -> list[dict[str, str]]:
-    """Fetch sent emails from Gmail (used for style analysis)."""
-    from app.email.gmail_client import get_valid_token
-
-    try:
-        token, _ = await get_valid_token(str(user_id), db)
-        return await fetch_messages(token, max_results, query="in:sent", label_id="SENT")
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-
-
-@router.post("/send")
-async def send(
-    req: SendRequest,
+@router.get("/threads/{thread_id}")
+async def get_thread(
+    thread_id: str,
     user_id: uuid.UUID = Depends(verify_supabase_jwt),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
-    """Send an email via Gmail."""
-    from app.email.gmail_client import get_valid_token
-
     try:
-        token, _ = await get_valid_token(str(user_id), db)
-        return await send_email(token, req.to, req.subject, req.body, req.thread_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        _, token = await get_valid_token(db, user_id)
+        return await fetch_thread(token, thread_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

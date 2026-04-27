@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pathlib import Path
 
 
 class Settings(BaseSettings):
@@ -9,10 +10,12 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
     supabase_jwt_secret: str = ""
     supabase_db_url: str = ""  # postgresql+asyncpg://...
+    supabase_db_ssl_verify: bool = True
 
     # Google OAuth
     google_client_id: str = ""
     google_client_secret: str = ""
+    app_encryption_key: str = ""
 
     # OpenRouter LLM
     openrouter_api_key: str = ""
@@ -23,7 +26,10 @@ class Settings(BaseSettings):
     cors_origins: str = "*"
     debug: bool = False
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {
+        "env_file": str(Path(__file__).resolve().parents[1] / ".env"),
+        "env_file_encoding": "utf-8",
+    }
 
 
 settings = Settings()

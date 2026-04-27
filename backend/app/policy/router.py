@@ -1,5 +1,6 @@
-"""Policy/rulebook ingestion and RAG retrieval endpoints (Layer 2)."""
+"""Rulebook ingestion and retrieval hooks."""
 
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.middleware import verify_supabase_jwt
 from app.database import get_db
-from app.models.policy import PolicyChunk, PolicyDocument
+from app.models.mvp import DocumentType, PolicyChunk, PolicyDocument, RulebookStatus
+from app.services.workspace import get_account_for_user
 
 router = APIRouter()
 
@@ -17,22 +19,9 @@ router = APIRouter()
 class IngestRequest(BaseModel):
     title: str
     raw_text: str
-    source_type: str = "manual"
-    office_id: str | None = None
-
-
-class IngestResponse(BaseModel):
-    document_id: str
-    title: str
-    chunk_count: int
-
-
-class PolicyDocumentResponse(BaseModel):
-    id: str
-    title: str
-    source_type: str
-    chunk_count: int
-    office_id: str | None = None
+    file_name: str = "manual-upload.txt"
+    mime_type: str = "text/plain"
+    document_type: DocumentType = DocumentType.rulebook
 
 
 class PolicySearchRequest(BaseModel):
@@ -40,31 +29,17 @@ class PolicySearchRequest(BaseModel):
     top_k: int = 5
 
 
-class PolicySearchResult(BaseModel):
-    chunk_text: str
-    document_title: str
-    chunk_index: int
-
-
-def _chunk_text(text: str, max_tokens: int = 500) -> list[str]:
-    """Split text into chunks of approximately max_tokens words."""
+def _chunk_text(text: str, size: int = 500) -> list[str]:
     words = text.split()
     chunks: list[str] = []
-    current_chunk: list[str] = []
-    current_count = 0
-
-    for word in words:
-        current_chunk.append(word)
-        current_count += 1
-        if current_count >= max_tokens:
-            chunks.append(" ".join(current_chunk))
-            current_chunk = []
-            current_count = 0
-
-    if current_chunk:
-        chunks.append(" ".join(current_chunk))
-
+    for idx in range(0, len(words), size):
+        chunks.append(" ".join(words[idx : idx + size]))
     return chunks
+
+
+def _summary(text: str) -> str:
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    return " ".join(sentences[:3])[:1200]
 
 
 @router.post("/ingest")
@@ -72,62 +47,65 @@ async def ingest_policy(
     req: IngestRequest,
     user_id: uuid.UUID = Depends(verify_supabase_jwt),
     db: AsyncSession = Depends(get_db),
-) -> IngestResponse:
-    """Upload, chunk, and store a policy document for RAG retrieval."""
+) -> dict[str, object]:
     if not req.raw_text.strip():
         raise HTTPException(status_code=400, detail="Document text cannot be empty.")
 
-    # Create the document record
-    doc = PolicyDocument(
-        user_id=user_id,
+    account = await get_account_for_user(db, user_id)
+    document = PolicyDocument(
+        account_id=account.id,
         title=req.title,
-        source_type=req.source_type,
-        raw_text=req.raw_text,
-        office_id=req.office_id,
+        document_type=req.document_type,
+        file_name=req.file_name,
+        storage_path=f"manual://{req.file_name}",
+        mime_type=req.mime_type,
+        summary=_summary(req.raw_text),
+        status=RulebookStatus.processed,
+        created_by_user_id=user_id,
+        extracted_text=req.raw_text,
     )
-    db.add(doc)
-    await db.flush()  # Get the doc ID
+    db.add(document)
+    await db.flush()
 
-    # Chunk the text
-    chunks = _chunk_text(req.raw_text)
-    for i, chunk_text in enumerate(chunks):
-        chunk = PolicyChunk(
-            document_id=doc.id,
-            user_id=user_id,
-            chunk_text=chunk_text,
-            chunk_index=i,
-            token_count=len(chunk_text.split()),
+    for index, chunk in enumerate(_chunk_text(req.raw_text)):
+        db.add(
+            PolicyChunk(
+                rulebook_id=document.id,
+                account_id=account.id,
+                chunk_index=index,
+                content=chunk,
+                chunk_metadata={"source": req.file_name},
+            )
         )
-        db.add(chunk)
 
-    doc.chunk_count = len(chunks)
-
-    return IngestResponse(
-        document_id=str(doc.id),
-        title=doc.title,
-        chunk_count=len(chunks),
-    )
+    await db.flush()
+    return {
+        "document_id": str(document.id),
+        "title": document.title,
+        "status": document.status.value,
+    }
 
 
 @router.get("/documents")
 async def list_documents(
     user_id: uuid.UUID = Depends(verify_supabase_jwt),
     db: AsyncSession = Depends(get_db),
-) -> list[PolicyDocumentResponse]:
-    """List all policy documents for the authenticated user."""
+) -> list[dict[str, object]]:
+    account = await get_account_for_user(db, user_id)
     result = await db.execute(
-        select(PolicyDocument).where(PolicyDocument.user_id == user_id).order_by(PolicyDocument.created_at.desc())
+        select(PolicyDocument).where(PolicyDocument.account_id == account.id).order_by(PolicyDocument.created_at.desc())
     )
-    docs = result.scalars().all()
+    documents = result.scalars().all()
     return [
-        PolicyDocumentResponse(
-            id=str(d.id),
-            title=d.title,
-            source_type=d.source_type,
-            chunk_count=d.chunk_count,
-            office_id=d.office_id,
-        )
-        for d in docs
+        {
+            "id": str(document.id),
+            "title": document.title,
+            "document_type": document.document_type.value,
+            "status": document.status.value,
+            "summary": document.summary,
+            "created_at": document.created_at.isoformat() if document.created_at else None,
+        }
+        for document in documents
     ]
 
 
@@ -137,18 +115,16 @@ async def delete_document(
     user_id: uuid.UUID = Depends(verify_supabase_jwt),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, bool]:
-    """Delete a policy document and its chunks."""
+    account = await get_account_for_user(db, user_id)
     result = await db.execute(
-        select(PolicyDocument).where(PolicyDocument.id == document_id, PolicyDocument.user_id == user_id)
+        select(PolicyDocument).where(PolicyDocument.id == document_id, PolicyDocument.account_id == account.id)
     )
-    doc = result.scalar_one_or_none()
-    if not doc:
+    document = result.scalar_one_or_none()
+    if not document:
         raise HTTPException(status_code=404, detail="Document not found.")
 
-    # Delete chunks first
-    await db.execute(delete(PolicyChunk).where(PolicyChunk.document_id == document_id))
-    await db.delete(doc)
-
+    await db.execute(delete(PolicyChunk).where(PolicyChunk.rulebook_id == document.id))
+    await db.delete(document)
     return {"deleted": True}
 
 
@@ -157,41 +133,30 @@ async def search_policy(
     req: PolicySearchRequest,
     user_id: uuid.UUID = Depends(verify_supabase_jwt),
     db: AsyncSession = Depends(get_db),
-) -> list[PolicySearchResult]:
-    """Search policy documents using keyword matching.
-
-    Note: This is a basic keyword search implementation.
-    Full vector similarity search will be enabled once pgvector
-    embeddings are generated for each chunk.
-    """
-    query_words = req.query.lower().split()
+) -> list[dict[str, object]]:
+    account = await get_account_for_user(db, user_id)
+    query_words = [word for word in req.query.lower().split() if word]
     if not query_words:
         return []
 
-    # Basic keyword search across chunks belonging to this user
     result = await db.execute(
-        select(PolicyChunk, PolicyDocument.title)
-        .join(PolicyDocument, PolicyChunk.document_id == PolicyDocument.id)
-        .where(PolicyChunk.user_id == user_id)
-        .order_by(PolicyChunk.chunk_index)
+        select(PolicyChunk).where(PolicyChunk.account_id == account.id).order_by(PolicyChunk.chunk_index.asc())
     )
-    rows = result.all()
+    chunks = result.scalars().all()
 
-    # Score chunks by keyword overlap
-    scored: list[tuple[float, PolicyChunk, str]] = []
-    for chunk, doc_title in rows:
-        chunk_lower = chunk.chunk_text.lower()
-        score = sum(1 for word in query_words if word in chunk_lower)
+    scored: list[tuple[int, PolicyChunk]] = []
+    for chunk in chunks:
+        score = sum(1 for word in query_words if word in chunk.content.lower())
         if score > 0:
-            scored.append((score, chunk, doc_title))
+            scored.append((score, chunk))
 
-    scored.sort(key=lambda x: x[0], reverse=True)
-
+    scored.sort(key=lambda item: item[0], reverse=True)
     return [
-        PolicySearchResult(
-            chunk_text=chunk.chunk_text,
-            document_title=doc_title,
-            chunk_index=chunk.chunk_index,
-        )
-        for _, chunk, doc_title in scored[: req.top_k]
+        {
+            "rulebook_id": str(chunk.rulebook_id),
+            "chunk_index": chunk.chunk_index,
+            "content": chunk.content,
+            "metadata": chunk.chunk_metadata,
+        }
+        for _, chunk in scored[: req.top_k]
     ]
