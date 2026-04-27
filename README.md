@@ -1,73 +1,113 @@
-# Welcome to your Lovable project
+# Relayr MVP
 
-## Project info
+Relayr is an AI-assisted email drafting workflow for educational staff. The local MVP uses a React frontend, a FastAPI backend, Supabase Auth/Postgres, Gmail, and OpenRouter.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Local MVP Architecture
 
-## How can I edit this code?
+- Frontend: Vite + React on `http://localhost:8080`
+- Backend: FastAPI on `http://127.0.0.1:8000`
+- Auth: Supabase Auth
+- Database: Supabase Postgres
+- Email provider: Gmail
+- LLM provider: OpenRouter
 
-There are several ways of editing your application.
+The frontend proxies `/api/*` requests to the FastAPI backend during local development.
 
-**Use Lovable**
+## Required Accounts And Keys
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+Before the full MVP can run end-to-end, you need:
 
-Changes made via Lovable will be committed automatically to this repo.
+- One Supabase project with:
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_PUBLISHABLE_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `SUPABASE_JWT_SECRET`
+  - `SUPABASE_DB_URL`
+- One Google Cloud OAuth app with Gmail scopes for read/send:
+  - `GOOGLE_CLIENT_ID`
+  - `GOOGLE_CLIENT_SECRET`
+- One OpenRouter API key:
+  - `OPENROUTER_API_KEY`
+- One Fernet key for app-layer token encryption:
+  - `APP_ENCRYPTION_KEY`
 
-**Use your preferred IDE**
+## Frontend Setup
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+cp .env.example .env
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Fill [/.env.example](/Users/tahseenjahan/development/relayr-devin/.env.example:1) into your local `.env` with:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_SUPABASE_PROJECT_ID`
+- `VITE_GOOGLE_CLIENT_ID`
+- `VITE_GMAIL_TRANSPORT=fastapi`
 
-**Use GitHub Codespaces**
+## Backend Setup
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+See the backend-specific guide in [backend/README.md](/Users/tahseenjahan/development/relayr-devin/backend/README.md:1).
 
-## What technologies are used for this project?
+Quick start:
 
-This project is built with:
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+cp .env.example .env
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Verification Commands
 
-## How can I deploy this project?
+Frontend:
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+```bash
+npm test
+npm run build
+```
 
-## Can I connect a custom domain to my Lovable project?
+Backend:
 
-Yes, you can!
+```bash
+cd backend
+source .venv/bin/activate
+pytest
+python -c "import sys; sys.path.insert(0, '.'); import app.main; print('backend-import-ok')"
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Full Verification Checklist
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Verification is only considered complete when all of these are true:
+
+- Backend dependencies install cleanly
+- `alembic upgrade head` succeeds against your Supabase database
+- FastAPI boots locally and `/api/health` returns `ok`
+- Frontend boots on `http://localhost:8080`
+- Supabase sign-in works locally
+- Gmail connection succeeds
+- Persona selection and persona build succeed
+- Draft generation, approval, and send succeed
+
+## Current Automated Coverage
+
+Already wired into the repo:
+
+- Backend API tests for health, Gmail status, persona selection/build, and draft lifecycle
+- Frontend tests for persona setup and ticket draft flow
+- Frontend production build validation
+
+## Remaining Manual Steps
+
+These still require your real credentials and third-party configuration:
+
+- Supabase project configuration
+- Google OAuth consent screen and redirect URIs
+- OpenRouter key
+- Real local `.env` files
+- Live Gmail and LLM verification

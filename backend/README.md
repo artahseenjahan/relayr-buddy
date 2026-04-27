@@ -1,84 +1,103 @@
 # Relayr Backend
 
-FastAPI backend for the Relayr AI Executive Assistant.
+FastAPI backend for the Relayr MVP. It owns Gmail integration, persona generation, employee profile context, draft generation, approval, and send orchestration.
 
-## Quick Start
+## Local Setup
 
 ```bash
 cd backend
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-
-# Copy and fill in environment variables
 cp .env.example .env
-
-# Run the dev server
+alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-## API Docs
+## Required Environment Variables
 
-Once running, visit:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+Fill [backend/.env.example](/Users/tahseenjahan/development/relayr-devin/backend/.env.example:1) into `backend/.env`.
 
-## Architecture
+Required for startup and live flows:
 
-The backend implements a 3-layer intelligence pipeline:
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_JWT_SECRET`
+- `SUPABASE_DB_URL`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `APP_ENCRYPTION_KEY`
+- `OPENROUTER_API_KEY`
 
-1. **Layer 1 — Writing Style Learning**: Analyzes staff sent emails to build per-person style profiles
-2. **Layer 2 — Policy RAG**: Ingests university rulebooks as chunked documents for retrieval
-3. **Layer 3 — AI Draft Generation**: Combines style + policy context to generate email drafts
+Helpful notes:
 
-### Tech Stack
-
-- **FastAPI** + Uvicorn (async API server)
-- **SQLAlchemy** + Alembic (ORM + migrations)
-- **Supabase PostgreSQL** + pgvector (database with vector search)
-- **OpenRouter** (LLM API, OpenAI-compatible)
-- **Supabase Auth** (JWT verification)
-
-### Project Structure
-
-```
-backend/
-├── app/
-│   ├── main.py           # FastAPI app entry point
-│   ├── config.py          # Settings from env vars
-│   ├── database.py        # Async SQLAlchemy session
-│   ├── auth/              # JWT verification middleware
-│   ├── email/             # Gmail OAuth + email operations
-│   ├── persona/           # Layer 1: Writing style analysis
-│   ├── policy/            # Layer 2: Policy RAG
-│   ├── draft/             # Layer 3: AI draft generation
-│   ├── routing/           # Email routing rules
-│   └── models/            # SQLAlchemy models
-├── alembic/               # Database migrations
-├── Dockerfile             # Container for Cloud Run
-└── pyproject.toml         # Dependencies
-```
-
-## Database Migrations
+- Use the Supabase session pooler URL for `SUPABASE_DB_URL`
+- Keep the async driver prefix: `postgresql+asyncpg://...`
+- URL-encode special characters in the database password
+- Generate `APP_ENCRYPTION_KEY` with:
 
 ```bash
-# Generate a new migration after model changes
-alembic revision --autogenerate -m "description"
-
-# Run migrations
-alembic upgrade head
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-## Deployment (Google Cloud Run)
+## Local Verification
+
+Backend tests:
 
 ```bash
-# Build and push container
-gcloud builds submit --tag gcr.io/PROJECT_ID/relayr-backend
-
-# Deploy
-gcloud run deploy relayr-backend \
-  --image gcr.io/PROJECT_ID/relayr-backend \
-  --platform managed \
-  --allow-unauthenticated \
-  --set-env-vars "SUPABASE_URL=...,SUPABASE_SERVICE_ROLE_KEY=..."
+cd backend
+source .venv/bin/activate
+pytest
 ```
+
+Import/startup smoke check:
+
+```bash
+cd backend
+source .venv/bin/activate
+python -c "import sys; sys.path.insert(0, '.'); import app.main; print('backend-import-ok')"
+```
+
+Health check after boot:
+
+```bash
+curl http://127.0.0.1:8000/api/health
+```
+
+Expected response:
+
+```json
+{"status":"ok","service":"relayr-backend"}
+```
+
+## MVP Service Areas
+
+- `app/email`: Gmail connect, status, metadata listing, thread fetch, send
+- `app/persona`: persona source email selection and persona build
+- `app/employee`: employee role/profile context
+- `app/draft`: contextual draft generation, approval, send
+- `app/policy`: rulebook upload and retrieval hooks for later phases
+- `app/services`: orchestration, Gmail token handling, encryption, prompt assembly
+
+## Verification Gates
+
+The backend is only fully verified when:
+
+- dependencies install cleanly
+- migrations succeed against the target Supabase database
+- imports succeed
+- FastAPI starts locally
+- `/api/health` responds
+- authenticated routes accept a real Supabase JWT
+- Gmail connect and send flow works with a real Google OAuth app
+- OpenRouter-powered persona and draft generation work with a real API key
+
+## Current Automated Coverage
+
+The current backend test suite covers:
+
+- health endpoint
+- Gmail status route contract
+- persona selection validation
+- persona build route contract
+- draft generate/approve/send route contract
