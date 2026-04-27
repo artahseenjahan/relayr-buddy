@@ -1,473 +1,319 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
-import { useAuth } from '../hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { UserCircle, Plus, X, CheckCircle2, Sparkles, Mail, ShieldCheck, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Building2 } from 'lucide-react';
-import OnboardingLayout from '../components/OnboardingLayout';
-import { ToneDefault } from '../types';
-import { fetchSentEmails, checkGmailConnection, GmailMessageMeta } from '../lib/gmailApi';
-import { extractPersonaFromEmails, ExtractedPersonaProfile } from '../lib/personaExtractor';
-import { offices, personas as allPersonas } from '../data/mockDb';
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { Mail, RefreshCw, Sparkles, UserCircle } from "lucide-react";
 
-const ListField = ({ label, items, onChange, placeholder }: { label: string; items: string[]; onChange: (items: string[]) => void; placeholder?: string }) => {
-  const [input, setInput] = useState('');
-  const add = () => {
-    if (input.trim()) { onChange([...items, input.trim()]); setInput(''); }
-  };
-  return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <div className="flex gap-2">
-        <Input value={input} onChange={e => setInput(e.target.value)} placeholder={placeholder || 'Add…'}
-          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), add())} />
-        <Button type="button" variant="outline" size="icon" onClick={add}><Plus className="w-4 h-4" /></Button>
-      </div>
-      {items.map((item, i) => (
-        <div key={i} className="flex items-center gap-2 text-sm bg-muted rounded px-2 py-1">
-          <span className="flex-1">{item}</span>
-          <button type="button" onClick={() => onChange(items.filter((_, j) => j !== i))}>
-            <X className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
-          </button>
-        </div>
-      ))}
-    </div>
-  );
+import OnboardingLayout from "../components/OnboardingLayout";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuth } from "@/hooks/useAuth";
+import { checkGmailConnection } from "@/lib/gmailApi";
+import { getEmployeeProfile, upsertEmployeeProfile } from "@/lib/employeeProfileApi";
+import { buildPersona, fetchPersonaSourceEmails, getCurrentPersona, savePersonaSelection } from "@/lib/personaApi";
+import type { EmployeeProfileApi, PersonaProfileApi } from "@/types";
+
+type EmployeeForm = {
+  title: string;
+  department: string;
+  office_name: string;
+  responsibilities_summary: string;
+  role_guidelines_summary: string;
+};
+
+const EMPTY_FORM: EmployeeForm = {
+  title: "",
+  department: "",
+  office_name: "",
+  responsibilities_summary: "",
+  role_guidelines_summary: "",
 };
 
 export default function SetupPersona() {
   const navigate = useNavigate();
-  const [gmailConnected, setGmailConnected] = useState(false);
-  const [gmailEmail, setGmailEmail] = useState<string | null>(null);
   const { user } = useAuth();
+  const [gmailConnected, setGmailConnected] = useState<boolean | null>(null);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [buildingPersona, setBuildingPersona] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [messages, setMessages] = useState<Array<{ id: string; subject: string; snippet: string; date: string; from?: string }>>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [personaName, setPersonaName] = useState("Primary Persona");
+  const [currentPersona, setCurrentPersona] = useState<PersonaProfileApi | null>(null);
+  const [employeeProfile, setEmployeeProfile] = useState<EmployeeForm>(EMPTY_FORM);
 
   useEffect(() => {
-    if (user) {
-      checkGmailConnection().then(res => {
-        setGmailConnected(res.connected);
-        setGmailEmail(res.email || null);
-      }).catch(() => {});
-    }
+    if (!user) return;
+
+    checkGmailConnection()
+      .then((result) => setGmailConnected(result.connected))
+      .catch(() => setGmailConnected(false));
+
+    getEmployeeProfile()
+      .then((profile: EmployeeProfileApi) =>
+        setEmployeeProfile({
+          title: profile.title,
+          department: profile.department,
+          office_name: profile.office_name,
+          responsibilities_summary: profile.responsibilities_summary,
+          role_guidelines_summary: profile.role_guidelines_summary,
+        }),
+      )
+      .catch(() => {});
+
+    getCurrentPersona()
+      .then(setCurrentPersona)
+      .catch(() => {});
   }, [user]);
-  const [roleTitle, setRoleTitle] = useState('');
-  const [authorityLevel, setAuthorityLevel] = useState('2');
-  const [toneDefault, setToneDefault] = useState<ToneDefault>('warm-professional');
-  const [signatureBlock, setSignatureBlock] = useState('');
-  const [communicationStructure, setCommunicationStructure] = useState('greeting, acknowledgement, answer, next_steps, closing, signature');
-  const [canDo, setCanDo] = useState<string[]>([]);
-  const [cannotDo, setCannotDo] = useState<string[]>([]);
-  const [approvedPhrases, setApprovedPhrases] = useState<string[]>([]);
-  const [safeLanguageTemplates, setSafeLanguageTemplates] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
 
-  // Gmail calibration state
-  const [gmailStep, setGmailStep] = useState<'office_select' | 'idle' | 'loading' | 'selecting' | 'extracting' | 'preview'>('office_select');
-  const [gmailOfficeId, setGmailOfficeId] = useState<string>('');
-  const [gmailPersonaId, setGmailPersonaId] = useState<string>('');
-  const [gmailCustomRole, setGmailCustomRole] = useState<string>('');
-  const [gmailEmails, setGmailEmails] = useState<GmailMessageMeta[]>([]);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [extractedProfile, setExtractedProfile] = useState<ExtractedPersonaProfile | null>(null);
-  const [gmailError, setGmailError] = useState<string | null>(null);
-  const [gmailExpanded, setGmailExpanded] = useState(false);
+  const selectedCount = selectedIds.size;
+  const canBuild = selectedCount > 0 && selectedCount <= 30;
+  const canSaveProfile = Object.values(employeeProfile).every((value) => value.trim().length > 0);
 
-  const officePersonas = allPersonas.filter(p => p.officeId === gmailOfficeId);
-  const gmailRoleLabel = allPersonas.find(p => p.id === gmailPersonaId)?.roleTitle || gmailCustomRole || '—';
-  const canProceed = gmailOfficeId !== '' && (gmailPersonaId !== '' || gmailCustomRole.trim() !== '');
+  const sortedMessages = useMemo(
+    () => [...messages].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()),
+    [messages],
+  );
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Save to database if user is authenticated
-    if (user) {
-      setSaving(true);
-      try {
-        const { error } = await supabase.from('personas').upsert({
-          user_id: user.id,
-          role_title: roleTitle,
-          authority_level: parseInt(authorityLevel),
-          tone_default: toneDefault,
-          signature_block: signatureBlock,
-          communication_structure: communicationStructure,
-          can_do: canDo,
-          cannot_do: cannotDo,
-          approved_phrases: approvedPhrases,
-          safe_language_templates: safeLanguageTemplates,
-          office_id: gmailOfficeId || null,
-          formality_score: extractedProfile?.formalityScore ?? null,
-          warmth_score: extractedProfile?.warmthScore ?? null,
-          conciseness_score: extractedProfile?.conciseScore ?? null,
-        }, { onConflict: 'user_id' });
-        
-        if (error) throw error;
-        toast.success('Persona saved successfully!');
-      } catch (err: any) {
-        toast.error('Failed to save persona: ' + (err.message || 'Unknown error'));
-        setSaving(false);
-        return;
-      }
-      setSaving(false);
-    }
-    
-    navigate('/inbox');
-  };
-
-  const loadGmailEmails = async () => {
-    if (!gmailConnected) return;
-    setGmailStep('loading');
-    setGmailError(null);
+  const loadMessages = async () => {
+    setLoadingMessages(true);
     try {
-      const emails = await fetchSentEmails(50);
-      setGmailEmails(emails);
-      setGmailStep('selecting');
-      // Auto-select first 10
-      setSelectedIds(new Set(emails.slice(0, 10).map(e => e.id)));
-    } catch (err: any) {
-      setGmailError(err?.message || 'Failed to load emails. Please check your connection.');
-      setGmailStep('idle');
+      const result = await fetchPersonaSourceEmails();
+      setMessages(
+        result.messages.map((message) => ({
+          id: message.id,
+          subject: message.subject,
+          snippet: message.snippet,
+          date: message.date,
+          from: message.from,
+        })),
+      );
+      setSelectedIds(new Set(result.messages.slice(0, Math.min(10, result.messages.length)).map((message) => message.id)));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to load sent emails");
+    } finally {
+      setLoadingMessages(false);
     }
   };
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
+  const toggleMessage = (id: string) => {
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
       if (next.has(id)) {
         next.delete(id);
-      } else if (next.size < 25) {
+      } else if (next.size < 30) {
         next.add(id);
+      } else {
+        toast.error("You can select up to 30 emails.");
       }
       return next;
     });
   };
 
-  const handleExtract = async () => {
-    const selected = gmailEmails.filter(e => selectedIds.has(e.id));
-    if (selected.length === 0) return;
-    setGmailStep('extracting');
-    await new Promise(r => setTimeout(r, 800)); // brief processing pause for UX
-    const profile = extractPersonaFromEmails(selected);
-    setExtractedProfile(profile);
-    setGmailStep('preview');
+  const saveEmployee = async () => {
+    if (!canSaveProfile) {
+      toast.error("Complete the employee profile before saving.");
+      return;
+    }
+
+    setSavingProfile(true);
+    try {
+      await upsertEmployeeProfile(employeeProfile);
+      toast.success("Employee profile saved.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save employee profile");
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
-  const applyExtractedProfile = () => {
-    if (!extractedProfile) return;
-    setToneDefault(extractedProfile.toneDefault);
-    setApprovedPhrases(prev => {
-      const combined = [...new Set([...prev, ...extractedProfile.approvedPhrases])];
-      return combined.slice(0, 12);
-    });
-    setSafeLanguageTemplates(prev => {
-      const combined = [...new Set([...prev, ...extractedProfile.safeLanguageTemplates])];
-      return combined.slice(0, 6);
-    });
-    setGmailExpanded(false);
-    setGmailStep('idle');
-  };
+  const handleBuildPersona = async () => {
+    setBuildingPersona(true);
+    try {
+      const selectedMessages = sortedMessages
+        .filter((message) => selectedIds.has(message.id))
+        .map((message) => ({
+          gmail_message_id: message.id,
+          subject: message.subject,
+          snippet: message.snippet,
+          from_email: message.from ?? null,
+          direction: "sent",
+          to_emails: [],
+        }));
 
-  const ScoreBar = ({ value, label }: { value: number; label: string }) => (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground w-20 shrink-0">{label}</span>
-      <div className="flex-1 h-1.5 bg-border rounded-full overflow-hidden">
-        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.round(value * 100)}%` }} />
-      </div>
-      <span className="text-xs font-medium w-8 text-right">{Math.round(value * 100)}%</span>
-    </div>
-  );
+      const selection = await savePersonaSelection({
+        persona_name: personaName,
+        selected_messages: selectedMessages,
+      });
+      const persona = await buildPersona(selection.persona_profile_id);
+      setCurrentPersona(persona);
+      toast.success("Persona generated successfully.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to generate persona");
+    } finally {
+      setBuildingPersona(false);
+    }
+  };
 
   return (
     <OnboardingLayout step={4} totalSteps={4} title="Define Persona">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserCircle className="w-5 h-5 text-primary" />
-            Persona Configuration
-          </CardTitle>
-          <CardDescription>Define the voice and authority of this office persona</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-
-            {/* ── Gmail Calibration Panel ── */}
-            <div className="rounded-lg border border-primary/30 bg-primary/5 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setGmailExpanded(v => !v)}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-primary/10 transition-colors"
-              >
-                <Sparkles className="w-4 h-4 text-primary shrink-0" />
-                <div className="flex-1">
-                  <div className="text-sm font-semibold text-foreground">Calibrate Persona from Gmail</div>
-                  <div className="text-xs text-muted-foreground">Select your office &amp; role, then auto-extract tone from up to 30 sent emails (snippets only)</div>
-                </div>
-                {gmailConnected && (
-                  <span className="text-[10px] bg-primary/15 text-primary px-2 py-0.5 rounded-full font-medium">Connected</span>
-                )}
-                {gmailExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-              </button>
-
-              {gmailExpanded && (
-                <div className="border-t border-primary/20 p-4 space-y-4">
-
-                  {/* ── Office / role selector step ── */}
-                  {gmailStep === 'office_select' && (
-                    <div className="space-y-3">
-                      <div className="p-3 rounded-lg bg-muted text-xs text-muted-foreground">
-                        <p className="font-medium text-foreground flex items-center gap-1.5 mb-1">
-                          <Building2 className="w-3.5 h-3.5 text-primary" />
-                          Which office are you calibrating for?
-                        </p>
-                        <p>Relayr serves all administrative offices — select yours so the tone analysis reflects your specific communication context.</p>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Your Office</Label>
-                        <Select value={gmailOfficeId} onValueChange={v => { setGmailOfficeId(v); setGmailPersonaId(''); }}>
-                          <SelectTrigger className="h-9 text-sm">
-                            <SelectValue placeholder="Select office…" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {offices.map(o => (
-                              <SelectItem key={o.id} value={o.id}>
-                                <div className="flex flex-col">
-                                  <span>{o.name}</span>
-                                  <span className="text-[10px] text-muted-foreground">{o.description}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {gmailOfficeId && (
-                        <div className="space-y-1.5">
-                          <Label className="text-xs">Your Role</Label>
-                          {officePersonas.length > 0 ? (
-                            <Select value={gmailPersonaId} onValueChange={setGmailPersonaId}>
-                              <SelectTrigger className="h-9 text-sm">
-                                <SelectValue placeholder="Select role…" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {officePersonas.map(p => (
-                                  <SelectItem key={p.id} value={p.id}>
-                                    {p.roleTitle} <span className="text-muted-foreground text-[10px]">· Level {p.authorityLevel}</span>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <input
-                              value={gmailCustomRole}
-                              onChange={e => setGmailCustomRole(e.target.value)}
-                              placeholder="e.g. Front Office Coordinator"
-                              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                            />
-                          )}
-                        </div>
-                      )}
-                      <Button size="sm" className="w-full" disabled={!canProceed} onClick={() => setGmailStep('idle')}>
-                        Continue to Email Selection →
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Breadcrumb for post-selection steps */}
-                  {gmailStep !== 'office_select' && (
-                    <div className="flex items-center gap-2 text-[11px]">
-                      <button type="button" onClick={() => setGmailStep('office_select')} className="text-primary hover:underline">Change role</button>
-                      <span className="text-muted-foreground">·</span>
-                      <span className="text-muted-foreground">{offices.find(o => o.id === gmailOfficeId)?.name}</span>
-                      <span className="text-muted-foreground">·</span>
-                      <span className="font-medium text-foreground">{gmailRoleLabel}</span>
-                    </div>
-                  )}
-
-                  {gmailStep !== 'office_select' && !gmailConnected && (
-                    <div className="flex items-start gap-2 text-xs text-muted-foreground">
-                      <AlertCircle className="w-4 h-4 shrink-0 text-muted-foreground mt-0.5" />
-                      <span>Connect your Gmail account in <a href="/settings" className="text-primary hover:underline">Settings → Google Account</a> to enable calibration.</span>
-                    </div>
-                  )}
-
-                  {gmailStep !== 'office_select' && gmailConnected && (
-                    <>
-                      <div className="flex items-center gap-2 text-xs">
-                        <Mail className="w-3.5 h-3.5 text-primary" />
-                        <span className="text-muted-foreground">Connected as</span>
-                        <span className="font-medium text-foreground">{gmailEmail || "your Gmail"}</span>
-                      </div>
-
-                      {gmailError && (
-                        <div className="flex items-start gap-2 p-2.5 rounded bg-destructive/10 border border-destructive/20 text-xs text-destructive">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                          {gmailError}
-                        </div>
-                      )}
-
-                      {gmailStep === 'idle' && (
-                        <Button type="button" size="sm" className="w-full gap-1.5" onClick={loadGmailEmails}>
-                          <Mail className="w-3.5 h-3.5" /> Load My 30 Most Recent Sent Emails
-                        </Button>
-                      )}
-
-                      {gmailStep === 'loading' && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          Fetching sent emails (snippets only)…
-                        </div>
-                      )}
-
-                      {gmailStep === 'extracting' && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
-                          <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                          Analysing patterns for <strong className="text-foreground">{gmailRoleLabel}</strong>…
-                        </div>
-                      )}
-
-                      {gmailStep === 'selecting' && gmailEmails.length > 0 && (
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs text-muted-foreground">
-                              Select up to 30 emails. <span className="font-medium text-foreground">{selectedIds.size}/30 selected</span>
-                            </p>
-                            <Button type="button" size="sm" disabled={selectedIds.size === 0} onClick={handleExtract} className="gap-1.5 text-xs h-7">
-                              <Sparkles className="w-3 h-3" /> Extract Persona
-                            </Button>
-                          </div>
-                          <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
-                            {gmailEmails.map(email => (
-                              <label key={email.id} className={`flex items-start gap-2.5 p-2 rounded cursor-pointer hover:bg-accent transition-colors ${selectedIds.has(email.id) ? 'bg-primary/10 border border-primary/20' : 'border border-transparent'}`}>
-                                <Checkbox
-                                  checked={selectedIds.has(email.id)}
-                                  onCheckedChange={() => toggleSelect(email.id)}
-                                  disabled={!selectedIds.has(email.id) && selectedIds.size >= 30}
-                                  className="mt-0.5 shrink-0"
-                                />
-                                <div className="min-w-0">
-                                  <div className="text-xs font-medium truncate">{email.subject}</div>
-                                  <div className="text-[10px] text-muted-foreground truncate">{email.snippet}</div>
-                                </div>
-                              </label>
-                            ))}
-                          </div>
-                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                            <ShieldCheck className="w-3 h-3 text-primary" />
-                            Only snippets (~100 chars) are processed. Full email bodies are never read or stored.
-                          </div>
-                        </div>
-                      )}
-
-                      {gmailStep === 'preview' && extractedProfile && (
-                        <div className="space-y-3">
-                          <div className="p-3 rounded-lg bg-muted space-y-2">
-                            <p className="text-xs font-semibold text-foreground">Extraction Results · {gmailRoleLabel}</p>
-                            <p className="text-[10px] text-muted-foreground">{extractedProfile.styleSummary}</p>
-                            <div className="space-y-1.5 pt-1">
-                              <ScoreBar value={extractedProfile.formalityScore} label="Formality" />
-                              <ScoreBar value={extractedProfile.warmthScore} label="Warmth" />
-                              <ScoreBar value={extractedProfile.conciseScore} label="Conciseness" />
-                            </div>
-                          </div>
-                          <div className="p-3 rounded-lg bg-muted space-y-1.5">
-                            <p className="text-xs font-medium">Detected Style</p>
-                            <div className="flex gap-2 flex-wrap text-[10px]">
-                              <span className="px-2 py-0.5 rounded-full bg-primary/15 text-primary font-medium">Tone: {extractedProfile.toneDefault.replace('-', ' ')}</span>
-                              <span className="px-2 py-0.5 rounded-full bg-accent text-accent-foreground">Opens: {extractedProfile.dominantSalutation}</span>
-                              <span className="px-2 py-0.5 rounded-full bg-accent text-accent-foreground">Closes: {extractedProfile.dominantClosing}</span>
-                            </div>
-                          </div>
-                          {extractedProfile.approvedPhrases.length > 0 && (
-                            <div className="space-y-1">
-                              <p className="text-xs font-medium">Recurring Phrases</p>
-                              {extractedProfile.approvedPhrases.slice(0, 4).map((p, i) => (
-                                <div key={i} className="text-[10px] text-muted-foreground bg-muted rounded px-2 py-1 truncate">"{p}"</div>
-                              ))}
-                            </div>
-                          )}
-                          <div className="flex gap-2">
-                            <Button type="button" size="sm" className="flex-1 gap-1.5" onClick={applyExtractedProfile}>
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Apply to Persona
-                            </Button>
-                            <Button type="button" variant="outline" size="sm" onClick={() => setGmailStep('selecting')} className="gap-1.5">
-                              Re-select
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* ── Manual Form Fields ── */}
-            <div className="space-y-3">
-              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">1. Role</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Role Title</Label>
-                  <Input value={roleTitle} onChange={e => setRoleTitle(e.target.value)} placeholder="e.g. Admissions Counselor" required />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Authority Level (1–4)</Label>
-                  <Select value={authorityLevel} onValueChange={setAuthorityLevel}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {[1,2,3,4].map(n => <SelectItem key={n} value={String(n)}>Level {n}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UserCircle className="w-5 h-5 text-primary" />
+              Employee Profile
+            </CardTitle>
+            <CardDescription>Role context is used alongside your writing persona when generating drafts.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="title">Title</Label>
+                <Input id="title" value={employeeProfile.title} onChange={(e) => setEmployeeProfile((prev) => ({ ...prev, title: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="department">Department</Label>
+                <Input
+                  id="department"
+                  value={employeeProfile.department}
+                  onChange={(e) => setEmployeeProfile((prev) => ({ ...prev, department: e.target.value }))}
+                />
               </div>
             </div>
-
-            <div className="space-y-3">
-              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">2. Tone & Style</h3>
-              <div className="space-y-1.5">
-                <Label>Default Tone</Label>
-                <Select value={toneDefault} onValueChange={v => setToneDefault(v as ToneDefault)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="warm-professional">Warm-Professional</SelectItem>
-                    <SelectItem value="formal">Formal</SelectItem>
-                    <SelectItem value="concise">Concise</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Communication Structure</Label>
-                <Input value={communicationStructure} onChange={e => setCommunicationStructure(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Signature Block</Label>
-                <Textarea value={signatureBlock} onChange={e => setSignatureBlock(e.target.value)} rows={3}
-                  placeholder="Your name, title, office, email…" />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="office_name">Office Name</Label>
+              <Input
+                id="office_name"
+                value={employeeProfile.office_name}
+                onChange={(e) => setEmployeeProfile((prev) => ({ ...prev, office_name: e.target.value }))}
+              />
             </div>
-
-            <div className="space-y-3">
-              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">3. Authority & Boundaries</h3>
-              <ListField label="Can Do" items={canDo} onChange={setCanDo} placeholder="e.g. Answer questions about deadlines" />
-              <ListField label="Cannot Do" items={cannotDo} onChange={setCannotDo} placeholder="e.g. Guarantee admission" />
+            <div className="space-y-2">
+              <Label htmlFor="responsibilities_summary">Responsibilities Summary</Label>
+              <Textarea
+                id="responsibilities_summary"
+                rows={4}
+                value={employeeProfile.responsibilities_summary}
+                onChange={(e) => setEmployeeProfile((prev) => ({ ...prev, responsibilities_summary: e.target.value }))}
+              />
             </div>
-
-            <div className="space-y-3">
-              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">4. Approved Institutional Language</h3>
-              <ListField label="Approved Phrases" items={approvedPhrases} onChange={setApprovedPhrases} />
-              <ListField label="Safe Language Templates" items={safeLanguageTemplates} onChange={setSafeLanguageTemplates} />
+            <div className="space-y-2">
+              <Label htmlFor="role_guidelines_summary">Role Guidelines Summary</Label>
+              <Textarea
+                id="role_guidelines_summary"
+                rows={4}
+                value={employeeProfile.role_guidelines_summary}
+                onChange={(e) => setEmployeeProfile((prev) => ({ ...prev, role_guidelines_summary: e.target.value }))}
+              />
             </div>
-
-            <Button type="submit" className="w-full">
-              <CheckCircle2 className="w-4 h-4" /> Complete Setup & Go to Inbox
+            <Button type="button" onClick={saveEmployee} disabled={savingProfile || !canSaveProfile}>
+              {savingProfile ? "Saving…" : "Save Employee Profile"}
             </Button>
-          </form>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              Persona From Gmail
+            </CardTitle>
+            <CardDescription>Select up to 30 sent emails so Relayr can build your writing persona without storing full bodies long-term.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {gmailConnected === false && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm">
+                <div className="font-medium">Gmail is not connected yet.</div>
+                <div className="mt-1 text-muted-foreground">Connect Gmail before loading source emails for persona generation.</div>
+                <Button className="mt-3" variant="outline" onClick={() => navigate("/connect-email")}>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Connect Gmail
+                </Button>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="persona_name">Persona Name</Label>
+              <Input id="persona_name" value={personaName} onChange={(e) => setPersonaName(e.target.value)} />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" variant="outline" onClick={loadMessages} disabled={loadingMessages || gmailConnected !== true}>
+                <RefreshCw className={`mr-2 h-4 w-4 ${loadingMessages ? "animate-spin" : ""}`} />
+                {loadingMessages ? "Loading Sent Emails…" : "Load Sent Emails"}
+              </Button>
+              <span className="text-sm text-muted-foreground">{selectedCount}/30 selected</span>
+            </div>
+
+            {messages.length > 0 && (
+              <ScrollArea className="h-72 rounded-md border">
+                <div className="space-y-2 p-3">
+                  {sortedMessages.map((message) => {
+                    const checked = selectedIds.has(message.id);
+                    return (
+                      <label key={message.id} className="flex cursor-pointer gap-3 rounded-md border p-3 hover:bg-accent/50">
+                        <Checkbox checked={checked} onCheckedChange={() => toggleMessage(message.id)} />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium">{message.subject || "(no subject)"}</div>
+                          <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{message.snippet || "No snippet available."}</div>
+                          <div className="mt-1 text-[11px] text-muted-foreground">{message.date}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            )}
+
+            <div className="flex flex-wrap gap-3">
+              <Button type="button" onClick={handleBuildPersona} disabled={!canBuild || buildingPersona || gmailConnected !== true}>
+                {buildingPersona ? "Building Persona…" : "Build Persona"}
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => navigate("/inbox")}>
+                Continue to Inbox
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {currentPersona && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Current Persona</CardTitle>
+              <CardDescription>Status: {currentPersona.status}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div>
+                <div className="font-medium">Tone</div>
+                <div className="text-muted-foreground">{currentPersona.tone_summary || "No tone summary available."}</div>
+              </div>
+              <div>
+                <div className="font-medium">Style</div>
+                <div className="text-muted-foreground">{currentPersona.style_summary || "No style summary available."}</div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <div className="font-medium">Greeting Patterns</div>
+                  <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+                    {currentPersona.greeting_patterns.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+                <div>
+                  <div className="font-medium">Sign-off Patterns</div>
+                  <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+                    {currentPersona.signoff_patterns.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </OnboardingLayout>
   );
 }

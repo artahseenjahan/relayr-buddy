@@ -146,3 +146,53 @@ export interface Decision {
   decidedAt: string;
   notes: string;
 }
+
+export interface EmployeeProfileApi {
+  id: string;
+  account_id: string;
+  user_id: string;
+  title: string;
+  department: string;
+  office_name: string;
+  responsibilities_summary: string;
+  role_guidelines_summary: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface PersonaProfileApi {
+  id: string;
+  name: string;
+  tone_summary: string | null;
+  style_summary: string | null;
+  greeting_patterns: string[];
+  signoff_patterns: string[];
+  length_preference: string | null;
+  formatting_preferences: Record<string, unknown>;
+  preferred_phrases: string[];
+  do_not_use_phrases: string[];
+  source_email_count: number;
+  status: string;
+  last_built_at?: string | null;
+}
+
+export interface DraftResponseApi {
+  id: string;
+  account_id: string;
+  user_id: string;
+  gmail_connection_id: string;
+  source_gmail_message_id: string;
+  source_gmail_thread_id?: string | null;
+  recipient_email: string;
+  subject: string;
+  draft_body: string;
+  status: string;
+  generation_context: Record<string, unknown>;
+  persona_profile_id?: string | null;
+  employee_profile_id?: string | null;
+  approved_at?: string | null;
+  sent_at?: string | null;
+  error_message?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
