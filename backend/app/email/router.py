@@ -46,6 +46,8 @@ async def connect_gmail(
         return await exchange_oauth_code(req.code, req.redirect_uri, user_id, db)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc) or "Failed to connect Gmail.") from exc
 
 
 @router.get("/status")

@@ -109,7 +109,7 @@ async def upsert_gmail_connection(
         .where(GmailConnection.user_id == user_id)
         .order_by(GmailConnection.created_at.desc())
     )
-    connection = result.scalar_one_or_none()
+    connection = result.scalars().first()
     expiry = datetime.now(UTC) + timedelta(seconds=expires_in)
 
     if connection:
@@ -183,7 +183,7 @@ async def get_active_connection(db: AsyncSession, user_id: uuid.UUID) -> GmailCo
         .where(GmailConnection.user_id == user_id, GmailConnection.is_active.is_(True))
         .order_by(GmailConnection.updated_at.desc())
     )
-    connection = result.scalar_one_or_none()
+    connection = result.scalars().first()
     if not connection:
         raise ValueError("Gmail not connected. Please connect your Gmail account first.")
     return connection

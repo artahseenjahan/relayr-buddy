@@ -25,6 +25,15 @@ rulebook_status = postgresql.ENUM("uploaded", "processed", "failed", name="ruleb
 document_type = postgresql.ENUM("policy", "rulebook", "guide", "template", name="document_type")
 email_direction = postgresql.ENUM("sent", "received", name="email_direction")
 
+# Reuse the explicitly created enum types when attaching them to columns so
+# table creation doesn't try to CREATE TYPE a second time.
+account_role_column = postgresql.ENUM("owner", "admin", "manager", "member", name="account_role", create_type=False)
+persona_status_column = postgresql.ENUM("draft", "ready", "archived", name="persona_status", create_type=False)
+draft_status_column = postgresql.ENUM("draft", "approved", "sent", "failed", name="draft_status", create_type=False)
+rulebook_status_column = postgresql.ENUM("uploaded", "processed", "failed", name="rulebook_status", create_type=False)
+document_type_column = postgresql.ENUM("policy", "rulebook", "guide", "template", name="document_type", create_type=False)
+email_direction_column = postgresql.ENUM("sent", "received", name="email_direction", create_type=False)
+
 
 def upgrade() -> None:
     bind = op.get_bind()
@@ -53,7 +62,7 @@ def upgrade() -> None:
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("account_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("role", account_role, nullable=False),
+        sa.Column("role", account_role_column, nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(["account_id"], ["accounts.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -115,7 +124,7 @@ def upgrade() -> None:
         sa.Column("preferred_phrases", postgresql.ARRAY(sa.Text()), nullable=False),
         sa.Column("raw_summary", sa.Text(), nullable=True),
         sa.Column("source_email_count", sa.Integer(), nullable=False),
-        sa.Column("status", persona_status, nullable=False),
+        sa.Column("status", persona_status_column, nullable=False),
         sa.Column("last_built_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
@@ -132,7 +141,7 @@ def upgrade() -> None:
         sa.Column("gmail_connection_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("gmail_message_id", sa.String(length=255), nullable=False),
         sa.Column("gmail_thread_id", sa.String(length=255), nullable=True),
-        sa.Column("direction", email_direction, nullable=False),
+        sa.Column("direction", email_direction_column, nullable=False),
         sa.Column("from_email", sa.String(length=320), nullable=True),
         sa.Column("to_emails", postgresql.ARRAY(sa.Text()), nullable=False),
         sa.Column("subject", sa.Text(), nullable=True),
@@ -151,12 +160,12 @@ def upgrade() -> None:
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("account_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("title", sa.String(length=255), nullable=False),
-        sa.Column("document_type", document_type, nullable=False),
+        sa.Column("document_type", document_type_column, nullable=False),
         sa.Column("file_name", sa.String(length=255), nullable=False),
         sa.Column("storage_path", sa.Text(), nullable=False),
         sa.Column("mime_type", sa.String(length=255), nullable=False),
         sa.Column("summary", sa.Text(), nullable=True),
-        sa.Column("status", rulebook_status, nullable=False),
+        sa.Column("status", rulebook_status_column, nullable=False),
         sa.Column("created_by_user_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("extracted_text", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
@@ -190,7 +199,7 @@ def upgrade() -> None:
         sa.Column("recipient_email", sa.String(length=320), nullable=False),
         sa.Column("subject", sa.Text(), nullable=False),
         sa.Column("draft_body", sa.Text(), nullable=False),
-        sa.Column("status", draft_status, nullable=False),
+        sa.Column("status", draft_status_column, nullable=False),
         sa.Column("generation_context", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("persona_profile_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("employee_profile_id", postgresql.UUID(as_uuid=True), nullable=True),

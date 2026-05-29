@@ -1,7 +1,10 @@
 """Gmail API client — server-side implementation ported from the Supabase edge function."""
 
 import base64
+import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from uuid import uuid4
 
 import httpx
 from sqlalchemy import select
@@ -12,23 +15,81 @@ from app.models.google_token import GoogleToken
 
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GMAIL_BASE = "https://gmail.googleapis.com/gmail/v1/users/me"
+DEBUG_LOG_PATH = Path("/Users/tahseenjahan/development/.cursor/debug-dfaa24.log")
+
+
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict[str, object]) -> None:
+    payload = {
+        "sessionId": "dfaa24",
+        "runId": "pre-fix",
+        "hypothesisId": hypothesis_id,
+        "id": f"log_{uuid4().hex}",
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(datetime.now(UTC).timestamp() * 1000),
+    }
+    try:
+        with DEBUG_LOG_PATH.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except Exception:
+        pass
 
 
 async def exchange_oauth_code(
     code: str, redirect_uri: str, user_id: str, db: AsyncSession
 ) -> dict[str, object]:
     """Exchange an authorization code for tokens and store them in the DB."""
+    # region agent log
+    _debug_log(
+        "H1",
+        "app/email/gmail_client.py:exchange_oauth_code:entry",
+        "exchange_oauth_code called",
+        {"redirect_uri": redirect_uri, "code_len": len(code), "user_id_present": bool(user_id)},
+    )
+    # endregion
     async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            GOOGLE_TOKEN_URL,
-            data={
-                "code": code,
-                "client_id": settings.google_client_id,
-                "client_secret": settings.google_client_secret,
-                "redirect_uri": redirect_uri,
-                "grant_type": "authorization_code",
+        # region agent log
+        _debug_log(
+            "H2",
+            "app/email/gmail_client.py:exchange_oauth_code:before_token_post",
+            "posting to google token endpoint",
+            {
+                "url": GOOGLE_TOKEN_URL,
+                "has_client_id": bool(settings.google_client_id),
+                "has_client_secret": bool(settings.google_client_secret),
             },
         )
+        # endregion
+        try:
+            resp = await client.post(
+                GOOGLE_TOKEN_URL,
+                data={
+                    "code": code,
+                    "client_id": settings.google_client_id,
+                    "client_secret": settings.google_client_secret,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code",
+                },
+            )
+        except Exception as e:
+            # region agent log
+            _debug_log(
+                "H3",
+                "app/email/gmail_client.py:exchange_oauth_code:token_post_exception",
+                "exception during google token exchange HTTP call",
+                {"error_type": e.__class__.__name__, "error": str(e)},
+            )
+            # endregion
+            raise
+        # region agent log
+        _debug_log(
+            "H4",
+            "app/email/gmail_client.py:exchange_oauth_code:token_post_response",
+            "google token endpoint responded",
+            {"status_code": resp.status_code, "content_type": resp.headers.get("content-type", "")},
+        )
+        # endregion
         if resp.status_code != 200:
             raise ValueError(f"Token exchange failed: {resp.text}")
         tokens = resp.json()
@@ -38,6 +99,14 @@ async def exchange_oauth_code(
             "https://www.googleapis.com/oauth2/v3/userinfo",
             headers={"Authorization": f"Bearer {tokens['access_token']}"},
         )
+        # region agent log
+        _debug_log(
+            "H5",
+            "app/email/gmail_client.py:exchange_oauth_code:userinfo_response",
+            "google userinfo endpoint responded",
+            {"status_code": profile_resp.status_code},
+        )
+        # endregion
         profile = profile_resp.json() if profile_resp.status_code == 200 else {}
 
     import uuid
@@ -111,6 +180,14 @@ async def check_connection(user_id: str, db: AsyncSession) -> dict[str, object]:
     """Check if a user has Gmail connected."""
     import uuid
 
+    # region agent log
+    _debug_log(
+        "H10",
+        "app/email/gmail_client.py:check_connection:entry",
+        "check_connection called",
+        {"user_id_present": bool(user_id)},
+    )
+    # endregion
     result = await db.execute(select(GoogleToken).where(GoogleToken.user_id == uuid.UUID(user_id)))
     token_row = result.scalar_one_or_none()
     if not token_row:

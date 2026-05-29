@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -22,6 +23,69 @@ def _get_llm_client() -> AsyncOpenAI:
     if not settings.openrouter_api_key:
         raise ValueError("OpenRouter is not configured. Set OPENROUTER_API_KEY.")
     return AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=settings.openrouter_api_key)
+
+
+def _strip_code_fences(content: str) -> str:
+    text = content.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z0-9_-]*\n?", "", text)
+    if text.endswith("```"):
+        text = text[: text.rfind("```")]
+    return text.strip()
+
+
+def _normalize_draft_body(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+
+    # Unwrap quoted JSON-string payloads.
+    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        try:
+            decoded = json.loads(text)
+            if isinstance(decoded, str):
+                text = decoded.strip()
+        except json.JSONDecodeError:
+            pass
+
+    # If the model echoed a JSON object into draft_body, extract the nested draft_body field.
+    candidate = _strip_code_fences(text)
+    if candidate.startswith("{") and '"draft_body"' in candidate:
+        try:
+            nested = json.loads(candidate)
+            if isinstance(nested, dict) and nested.get("draft_body"):
+                return _normalize_draft_body(nested["draft_body"])
+        except json.JSONDecodeError:
+            pass
+
+    # Convert escaped newlines from stringified JSON into real line breaks.
+    text = text.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "\t")
+    return text.strip().strip('"').strip("'").strip()
+
+
+def _parse_llm_response(content: str) -> dict[str, Any]:
+    candidate = _strip_code_fences(content)
+    attempts = [candidate]
+
+    # Some providers return the whole JSON object as a JSON-encoded string.
+    try:
+        decoded = json.loads(candidate)
+        if isinstance(decoded, str):
+            attempts.append(_strip_code_fences(decoded))
+        elif isinstance(decoded, dict):
+            return decoded
+    except json.JSONDecodeError:
+        pass
+
+    for attempt in attempts:
+        try:
+            parsed = json.loads(attempt)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            continue
+
+    return {"draft_body": candidate, "confidence_score": 0.4, "rationale": "Non-JSON model response"}
 
 
 async def _resolve_optional_profiles(
@@ -119,19 +183,11 @@ async def generate_draft(
         max_tokens=1200,
     )
     content = (response.choices[0].message.content or "{}").strip()
-    if content.startswith("```"):
-        content = content.split("\n", 1)[1] if "\n" in content else content[3:]
-    if content.endswith("```"):
-        content = content[: content.rfind("```")]
-    content = content.strip()
-    try:
-        parsed = json.loads(content)
-    except json.JSONDecodeError:
-        parsed = {"draft_body": content, "confidence_score": 0.4, "rationale": "Non-JSON model response"}
+    parsed = _parse_llm_response(content)
 
     recipient_email = str(inbound_email.get("from", ""))
     subject = str(inbound_email.get("subject", "(no subject)"))
-    draft_body = str(parsed.get("draft_body", "")).strip()
+    draft_body = _normalize_draft_body(parsed.get("draft_body", ""))
     if not draft_body:
         raise ValueError("Draft generation returned an empty draft.")
 

@@ -1,14 +1,20 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
+
+const corsHeaders: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GMAIL_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 function getGoogleCreds() {
-  return {
-    clientId: Deno.env.get("VITE_GOOGLE_CLIENT_ID")!,
-    clientSecret: Deno.env.get("GOOGLE_CLIENT_SECRET")!,
-  };
+  const clientId = Deno.env.get("GOOGLE_CLIENT_ID") ?? Deno.env.get("VITE_GOOGLE_CLIENT_ID");
+  const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
+  if (!clientId || !clientSecret) {
+    throw new Error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET (set Edge Function secrets)");
+  }
+  return { clientId, clientSecret };
 }
 
 function getSupabaseAdmin() {
@@ -238,8 +244,9 @@ Deno.serve(async (req) => {
 
       case "search_sent": {
         const { token } = await getValidToken(user.id);
-        const query = (params.keywords || []).slice(0, 5).join(" OR ");
-        result = await fetchMessages(token, 8, `in:sent ${query}`, "SENT");
+        const parts = (params.keywords || []).slice(0, 5).map((k: string) => String(k).trim()).filter(Boolean);
+        const q = parts.length ? `in:sent (${parts.join(" OR ")})` : "in:sent";
+        result = await fetchMessages(token, 8, q, "SENT");
         break;
       }
 
@@ -265,7 +272,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    const msg = err instanceof Error ? err.message : String(err);
+    return new Response(JSON.stringify({ error: msg }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
